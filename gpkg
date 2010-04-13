@@ -1,0 +1,286 @@
+#!/bin/bash
+
+#
+# gpkg -- UI program for Xiange Linux package management system 
+# 
+# by Zhang Lihui <swordhuihui@gmail.com>, 2010-04-13, 15:58
+#
+
+#path define
+#XGPATH=/var/xiange
+XGPATH=../
+XGTOOLPATH=$XGPATH/tools
+XGLIBPATH=$XGPATH/xglibs
+
+#
+# version and  usage 
+#
+gpkg_version=0.10.0
+gpkg_usage="
+gpkg $gpkg_version, usage:\n
+	\t-v            \t\tshow current version\n
+	\t-s package 	\tsearch package\n
+	\t-d package 	\tdownload package\n
+	\t-i package 	\tinstall package\n
+	\t-D package 	\tremove package\n
+	\n
+XianGe base is at $XGPATH\n
+"
+
+gpkg_show_usage()
+{
+	echo -e $gpkg_usage
+}
+
+#
+# string functions
+#
+
+#check: if $2 in $1, return 1, else return 0
+gpkg_strin()
+{
+	if [ "${1/$2/}" != "${1}" ]; then
+		return 1
+	else
+		return 0
+	fi
+}
+
+#
+# version control
+#
+
+#parse atom to $N, $V, $R, 
+#by tomgrean @ LinuxSir, 2009-09-11, 20:02
+parse_atom()
+{
+	local ATOM
+	local RR
+
+	ATOM="${1%.xgb}"
+	RR="${ATOM%-r[0-9]*}"
+	R="${ATOM#$RR}"
+	V="${RR##*-}"
+	N="${RR%$V}"
+	N="${N%-}"
+}
+
+#compare 2 versions, such 2.6.9 and 2.6.10
+#return 0 if same. 
+#return 1 if $1 is grater than $2 
+#return 2 if $1 is lesser then $2
+#by lastart @ LinuxSir
+compare_version()
+{
+	v1=$1.
+	v2=$2.
+	while true
+	do
+		a=${v1%%.*}
+		b=${v2%%.*}
+		[ -z "$a" ] && [ -z "$b" ] &&  return 0
+		[ "$a"0 -gt "$b"0 ] && return 1
+		[ "$a"0 -lt "$b"0 ] && return 2
+		v1="${v1#*.}"
+		v2="${v2#*.}"
+	done
+}
+
+#compare 2 atoms, such as linux-2.6.9.xgb and linux-2.6.10.xgb
+compare_atom()
+{
+	local R1
+	local V1
+	local N1
+
+	#echo "Begin Compare: $1 $2"
+
+	parse_atom $1
+	R1=$R
+	V1=$V
+	N1=$N
+	#echo "N1=$N1, V1=$V1, R1=$R1"
+
+	parse_atom $2
+	#echo "N2=$N, V2=$V, R2=$R"
+
+	#compare version
+	compare_version $V1 $V
+}
+
+
+#
+# search packages
+#
+
+#list all pack types
+gpkg_get_types()
+{
+	gpkg_types=`ls $XGLIBPATH`
+}
+
+gpkg_get_packages()
+{
+	gpkg_packs=`ls $XGLIBPATH/$1`
+}
+
+#Get Newest file in $XGLIBPATH/$1
+gpkg_getnewest()
+{
+	local files
+	local file
+	newest=""
+
+	files=`ls $XGLIBPATH/$1`
+	for file in $files
+	do
+		if [ -z $newest ]; then
+			newest=$file
+			#echo "First is $file"
+		else
+			#compare 
+			#echo "compare $file $newest"
+			compare_atom $file $newest
+			[ "$?" == "1" ] && newest=$file
+			#echo "after compare: new=$newest"
+
+		fi
+	done
+}
+
+
+#find one packge $1 is type, $2 is package name, $3 is index
+gpkg_searchOK()
+{
+	#show it.
+	echo "* $1/$2"
+
+	#get newest version
+	gpkg_getnewest $1/$2
+	parse_atom $newest
+	echo -e "\tAvailable:\t $V$R"
+
+	#search installed
+	echo -e "\tInstalled:\t None"
+
+	#add blank line
+	echo ""
+}
+
+gpkg_search()
+{
+	local type
+	local pack
+	local count=0
+
+	gpkg_get_types
+	for type in $gpkg_types
+	do
+		gpkg_get_packages $type
+		for pack in $gpkg_packs
+		do
+			gpkg_strin $pack $1
+			if [ $? == 1 ]; then
+				#find one.
+				count=$(($count + 1))
+				gpkg_searchOK $type $pack $count
+			fi
+		done
+	done
+	echo "search $1, result count $count"
+}
+
+
+#
+# download packet
+#
+
+gpkg_begin_download()
+{
+	#echo "Found $1/$2"
+
+	#find newest version.
+	gpkg_getnewest $1/$2
+	echo $newest
+	parse_atom $newest
+
+	echo "Begin download $N-$V$R..."
+
+	#include package build scripts
+	. $XGLIBPATH/$1/$2/$newest
+
+	#call scripts
+	gpkg_getsrc
+}
+
+gpkg_download()
+{
+	local type
+	local pack
+	local count=0
+	declare -a retType
+	declare -a retPack
+
+	gpkg_get_types
+	for type in $gpkg_types
+	do
+		gpkg_get_packages $type
+		for pack in $gpkg_packs
+		do
+			if [ $1 == $pack ]; then
+				#find 
+				retType[$count]=$type
+				retPack[$count]=$pack
+				count=$(($count + 1))
+			fi
+		done
+	done
+	
+	#check result.
+	if [ "$count" == "0" ]; then
+		#not found
+		echo "Not Found"
+		return 1
+	fi
+
+	if [ "$count" == "1" ]; then
+		#OK, begin download
+		gpkg_begin_download ${retType[0]} ${retPack[0]}
+		return 0
+	fi
+
+	#find more, show and select.
+	echo "More result, $count, please select 1"
+
+	unset retType
+	unset retPack
+
+}
+
+#
+# parse parameters
+#
+case "${1}" in
+-v)
+	#show version.
+	echo $gpkg_version
+	;;
+
+-s)
+	#search package.
+	gpkg_search $2
+	;;
+
+-d)
+	gpkg_download $2
+	#download
+	;;
+
+*)
+	#show usage 
+	gpkg_show_usage
+	exit 0
+	;;
+esac
+
+
