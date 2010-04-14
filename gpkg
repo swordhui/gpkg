@@ -8,9 +8,12 @@
 
 #path define
 #XGPATH=/var/xiange
-XGPATH=../
-XGTOOLPATH=$XGPATH/tools
-XGLIBPATH=$XGPATH/xglibs
+XGPATH=..
+XGPATH_TOOLS=$XGPATH/tools
+XGPATH_LIB=$XGPATH/xglibs
+XGPATH_SOURCE=$XGPATH/sources
+XGPATH_UNPACK=/tmp/xiange/sources
+XGPATH_DEST=/tmp/xiange/pack
 
 #
 # version and  usage 
@@ -37,7 +40,7 @@ gpkg_show_usage()
 #
 
 #check: if $2 in $1, return 1, else return 0
-gpkg_strin()
+str_isIn()
 {
 	if [ "${1/$2/}" != "${1}" ]; then
 		return 1
@@ -52,7 +55,7 @@ gpkg_strin()
 
 #parse atom to $N, $V, $R, 
 #by tomgrean @ LinuxSir, 2009-09-11, 20:02
-parse_atom()
+atom_parse()
 {
 	local ATOM
 	local RR
@@ -70,7 +73,7 @@ parse_atom()
 #return 1 if $1 is grater than $2 
 #return 2 if $1 is lesser then $2
 #by lastart @ LinuxSir
-compare_version()
+atom_vercmp()
 {
 	v1=$1.
 	v2=$2.
@@ -87,7 +90,10 @@ compare_version()
 }
 
 #compare 2 atoms, such as linux-2.6.9.xgb and linux-2.6.10.xgb
-compare_atom()
+#return 0 if same. 
+#return 1 if $1 is grater than $2 
+#return 2 if $1 is lesser then $2
+atom_cmp()
 {
 	local R1
 	local V1
@@ -95,17 +101,17 @@ compare_atom()
 
 	#echo "Begin Compare: $1 $2"
 
-	parse_atom $1
+	atom_parse $1
 	R1=$R
 	V1=$V
 	N1=$N
 	#echo "N1=$N1, V1=$V1, R1=$R1"
 
-	parse_atom $2
+	atom_parse $2
 	#echo "N2=$N, V2=$V, R2=$R"
 
 	#compare version
-	compare_version $V1 $V
+	atom_vercmp $V1 $V
 }
 
 
@@ -116,22 +122,22 @@ compare_atom()
 #list all pack types
 gpkg_get_types()
 {
-	gpkg_types=`ls $XGLIBPATH`
+	gpkg_types=`ls $XGPATH_LIB 2>/dev/null`
 }
 
 gpkg_get_packages()
 {
-	gpkg_packs=`ls $XGLIBPATH/$1`
+	gpkg_packs=`ls $XGPATH_LIB/$1 2>/dev/null`
 }
 
-#Get Newest file in $XGLIBPATH/$1
+#Get Newest file in $XGPATH_LIB/$1
 gpkg_getnewest()
 {
 	local files
 	local file
 	newest=""
 
-	files=`ls $XGLIBPATH/$1`
+	files=`ls $XGPATH_LIB/$1 2>/dev/null`
 	for file in $files
 	do
 		if [ -z $newest ]; then
@@ -140,7 +146,7 @@ gpkg_getnewest()
 		else
 			#compare 
 			#echo "compare $file $newest"
-			compare_atom $file $newest
+			atom_cmp $file $newest
 			[ "$?" == "1" ] && newest=$file
 			#echo "after compare: new=$newest"
 
@@ -157,7 +163,7 @@ gpkg_searchOK()
 
 	#get newest version
 	gpkg_getnewest $1/$2
-	parse_atom $newest
+	atom_parse $newest
 	echo -e "\tAvailable:\t $V$R"
 
 	#search installed
@@ -179,7 +185,7 @@ gpkg_search()
 		gpkg_get_packages $type
 		for pack in $gpkg_packs
 		do
-			gpkg_strin $pack $1
+			str_isIn $pack $1
 			if [ $? == 1 ]; then
 				#find one.
 				count=$(($count + 1))
@@ -195,22 +201,77 @@ gpkg_search()
 # download packet
 #
 
+#check and download package, $1 is URL, $2 is local file name.
+check_and_download_raw()
+{
+	local fname=$2
+	local retry
+
+	#retry 3 times
+	for((retry=0; retry<3; retry++))
+	do
+		#check if package has already exist.
+		if [ -f ${XGPATH_SOURCE}/${fname} ]; then
+			printf "%s exists, Skip.\n" $fname
+			return 0
+		else
+			printf "downloading from %s, retry %d...\n" ${1} ${retry}
+			rm -f ${XGPATH_SOURCE}/${fname}.tmp
+			wget $1 -O ${XGPATH_SOURCE}/${fname}.tmp
+			if [ "$?" == 0 ]; then
+				#download ok.
+				mv ${XGPATH_SOURCE}/${fname}.tmp ${XGPATH_SOURCE}/${fname}
+				return 0
+			fi
+		fi
+	done
+
+	printf "down load failed, quit.\n"
+	return 1
+}
+
+#check and download package, $1 is URL.
+check_and_download()
+{
+	local fname=${1##*/}
+
+	#call raw mode.
+	check_and_download_raw $1 $fname
+}
+
+
 gpkg_begin_download()
 {
+	local url
+	local ret=0
+
 	#echo "Found $1/$2"
 
 	#find newest version.
 	gpkg_getnewest $1/$2
 	echo $newest
-	parse_atom $newest
+	atom_parse $newest
 
 	echo "Begin download $N-$V$R..."
 
 	#include package build scripts
-	. $XGLIBPATH/$1/$2/$newest
+	. $XGPATH_LIB/$1/$2/$newest
 
-	#call scripts
-	gpkg_getsrc
+	#init build script file
+	xgb_init
+
+	#download all files
+	for url in ${SRC_URI}
+	do
+		#echo $url
+		check_and_download $url
+		ret=$?
+		[ $ret != 0 ] && break
+	done
+
+	#check
+	[ $ret == 0 ] && echo "Download OK"
+	return $ret
 }
 
 gpkg_download()
@@ -218,8 +279,8 @@ gpkg_download()
 	local type
 	local pack
 	local count=0
-	declare -a retType
-	declare -a retPack
+	local -a retType
+	local -a retPack
 
 	gpkg_get_types
 	for type in $gpkg_types
@@ -246,7 +307,7 @@ gpkg_download()
 	if [ "$count" == "1" ]; then
 		#OK, begin download
 		gpkg_begin_download ${retType[0]} ${retPack[0]}
-		return 0
+		return 
 	fi
 
 	#find more, show and select.
@@ -255,6 +316,29 @@ gpkg_download()
 	unset retType
 	unset retPack
 
+}
+
+#
+# Install package
+#
+gpkg_install()
+{
+	#find xgb file
+
+	#call init
+
+	#call unpack
+
+	#call config
+
+	#call build
+
+	#call install
+
+	#make package
+
+	#call post_install
+	return 0
 }
 
 #
@@ -274,6 +358,10 @@ case "${1}" in
 -d)
 	gpkg_download $2
 	#download
+	;;
+
+-i)
+	gpkg_install $2
 	;;
 
 *)
