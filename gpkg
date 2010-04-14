@@ -7,13 +7,13 @@
 #
 
 #path define
-#XGPATH=/var/xiange
-XGPATH=..
+XGPATH=/var/xiange
 XGPATH_TOOLS=$XGPATH/tools
 XGPATH_LIB=$XGPATH/xglibs
 XGPATH_SOURCE=$XGPATH/sources
 XGPATH_UNPACK=/tmp/xiange/sources
 XGPATH_DEST=/tmp/xiange/pack
+XGPATH_SCRIPT=$XGPATH_LIB
 
 #
 # version and  usage 
@@ -48,6 +48,20 @@ str_isIn()
 		return 0
 	fi
 }
+
+#
+# Error check
+#
+
+#check return code. show $1 if error.
+err_check()
+{
+	if [ $? != 0 ]; then
+		echo $1
+		exit 1
+	fi
+}
+
 
 #
 # version control
@@ -175,7 +189,9 @@ gpkg_searchOK()
 
 gpkg_search()
 {
+	local gpkg_types
 	local type
+	local gpkg_packs
 	local pack
 	local count=0
 
@@ -216,13 +232,17 @@ check_and_download_raw()
 			return 0
 		else
 			printf "downloading from %s, retry %d...\n" ${1} ${retry}
-			rm -f ${XGPATH_SOURCE}/${fname}.tmp
+
+			[ -f ${XGPATH_SOURCE}/${fname}.tmp ] && \
+				rm -f ${XGPATH_SOURCE}/${fname}.tmp 
+
 			wget $1 -O ${XGPATH_SOURCE}/${fname}.tmp
 			if [ "$?" == 0 ]; then
 				#download ok.
 				mv ${XGPATH_SOURCE}/${fname}.tmp ${XGPATH_SOURCE}/${fname}
 				return 0
 			fi
+			sleep 2
 		fi
 	done
 
@@ -240,43 +260,26 @@ check_and_download()
 }
 
 
-gpkg_begin_download()
+
+
+#get xgb file based on package name in $1
+#set $XGPATH_SCRIPT and return value in $newest
+
+#call when decided package xgb directory
+gpkg_getxgbdirOK()
 {
-	local url
-	local ret=0
+	#set script path
+	XGPATH_SCRIPT=$XGPATH_LIB/$1/$2
 
-	#echo "Found $1/$2"
-
-	#find newest version.
+	#get the newest one
 	gpkg_getnewest $1/$2
-	echo $newest
-	atom_parse $newest
-
-	echo "Begin download $N-$V$R..."
-
-	#include package build scripts
-	. $XGPATH_LIB/$1/$2/$newest
-
-	#init build script file
-	xgb_init
-
-	#download all files
-	for url in ${SRC_URI}
-	do
-		#echo $url
-		check_and_download $url
-		ret=$?
-		[ $ret != 0 ] && break
-	done
-
-	#check
-	[ $ret == 0 ] && echo "Download OK"
-	return $ret
 }
 
-gpkg_download()
+gpkg_getxgbfile()
 {
+	local gpkg_types
 	local type
+	local gpkg_packs
 	local pack
 	local count=0
 	local -a retType
@@ -305,8 +308,9 @@ gpkg_download()
 	fi
 
 	if [ "$count" == "1" ]; then
-		#OK, begin download
-		gpkg_begin_download ${retType[0]} ${retPack[0]}
+		#OK, decide directory
+		gpkg_getxgbdirOK ${retType[0]} ${retPack[0]}
+		#echo $newest
 		return 
 	fi
 
@@ -315,30 +319,149 @@ gpkg_download()
 
 	unset retType
 	unset retPack
-
 }
+
+#begin download, $1 is atom, such as autoconf-2.63-r1.xgb
+gpkg_begin_download()
+{
+	local url
+
+	#echo "begin download from $XGPATH_SCRIPT/$1"
+
+	#find newest version.
+	atom_parse $1
+	echo "Begin download $N-$V$R..."
+
+	#clear all routines by include template file
+	. $XGPATH_LIB/template.xgb
+	err_check "[Error] $XGPATH_LIB/template.xgb not found."
+
+	#include package build scripts
+	. $XGPATH_SCRIPT/$1
+	err_check "[Error] $XGPATH_SCRIPT/$1 not found."
+
+	#init build script file
+	xgb_init
+
+	#create source directory.
+	mkdir -p $XGPATH_SOURCE
+	err_check "[Error] Create dir $XGPATH_SOURCE failed."
+
+	#download all files
+	for url in ${SRC_URI}
+	do
+		#echo $url
+		check_and_download $url
+		err_check "[Error] download $url failed."
+	done
+
+	#check
+	echo "Download OK"
+	return 0
+}
+
+gpkg_download()
+{
+	local newest
+
+	#get xgb file
+	gpkg_getxgbfile $1
+
+	if [ $? == 0 ]; then
+		#found, download it
+		gpkg_begin_download $newest
+
+	else
+		#not found
+		return 1
+	fi
+}
+
 
 #
 # Install package
 #
-gpkg_install()
-{
-	#find xgb file
 
-	#call init
+gpkg_mkpackage()
+{
+	local destpath=$XGPATH_DEST/var/xiange/db/$N-$V$R
+
+	#copy scripts file
+	mkdir -p $destpath
+	cp $XGPATH_SCRIPT/$N-$V$R.xgb $destpath/build.xgb
+
+	#generate file list
+	cd $XGPATH_DEST
+	find | xgfileinfo > /tmp/file-$N-$V$R
+	mv /tmp/file-$N-$V$R $destpath/file
+
+	#tar it.
+	tar cvjpf ../$N-$V$R.tar.bz2 *
+}
+
+gpkg_begininstall()
+{
+	local ret=0
 
 	#call unpack
 
+	# DO RM WITH CAUTION!! 
+	rm -rf /tmp/xiange/sources
+
+	mkdir -p $XGPATH_UNPACK
+	cd $XGPATH_UNPACK
+	xgb_unpack
+
 	#call config
+	xgb_config
 
 	#call build
+	xgb_build
 
 	#call install
+	XGPATH_DEST=/tmp/xiange/pack/$N-$V$R
+	rm -rf $XGPATH_DEST
+	mkdir -p $XGPATH_DEST
+	xgb_install
 
+	
 	#make package
+	gpkg_mkpackage
 
-	#call post_install
+
+	#copy to root
+
+	#post install
+
+	#save binary package
+
+	#clean up
 	return 0
+}
+
+gpkg_install()
+{
+	local newest
+	local ret
+
+	#get xgb file
+	gpkg_getxgbfile $1
+
+	if [ $? == 0 ]; then
+		#found, download it
+		gpkg_begin_download $newest
+		ret=$?
+		if [ $? == 0 ]; then
+			#download ok, install it.
+			gpkg_begininstall $newest
+		else
+			return $ret
+		fi
+
+	else
+		#not found
+		return 1
+	fi
 }
 
 #
@@ -362,6 +485,23 @@ case "${1}" in
 
 -i)
 	gpkg_install $2
+	;;
+
+--sync)
+	#sync with git.	
+	mkdir -p $XGPATH_LIB
+	err_check "[Error] Create dir $XGPATH_LIB failed."
+
+	cd $XGPATH_LIB
+	err_check "[Error] enter dir $XGPATH_LIB failed."
+
+	if [ -d .git ]; then
+		#alread exist.
+		git pull
+	else
+		cd ..
+		git clone git://github.com/swordhui/xglibs.git
+	fi
 	;;
 
 *)
