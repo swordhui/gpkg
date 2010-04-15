@@ -131,6 +131,31 @@ atom_cmp()
 	atom_vercmp $V1 $V
 }
 
+#
+# CSV file operation
+#
+
+#split csv line. 
+#input: $1="good,i love u,123"
+#output: count=3, value[0]=good, value[1]="i love u", value[2]=123
+csv_split()
+{
+	count=0
+	local retv=$1
+	unset value
+
+	while [ -n "$retv" ]
+	do
+		value[$count]=${retv%%,*}
+		#echo "value_$count=${value[$count]}"
+
+		retv=${retv#${value[$count]}}
+		retv=${retv#,}
+		#echo "retv=$retv"
+
+		count=$(($count+1))
+	done
+}
 
 #
 # search packages
@@ -171,6 +196,39 @@ gpkg_getnewest()
 	done
 }
 
+gpkg_searchInstalled()
+{
+	local searchpath=$XGPATH/db/$1/$2	
+	local findcnt=0
+
+	local files=$(ls $searchpath/*.xgb 2>/dev/null)
+	local file
+	local -a value
+	local t1
+	local t2
+	local tsize
+
+	for file in $files
+	do
+		file=${file##*/}
+		atom_parse $file
+
+		#get date.
+		csv_split `cat $searchpath/$N-$V$R.date`
+		t1=${value[0]}
+		t2=${value[1]}
+
+		#get size, 
+		csv_split `tail -n 1 $searchpath/$N-$V$R.file`
+		tsize=${value[5]}
+
+		printf "\tInstalled:\t %s  | %s %s %sK\n" $V$R $t1 $t2 $tsize 
+		findcnt=$(($findcnt+1))
+	done
+
+	[ "$findcnt" == "0" ] && echo -e "\tInstalled:\t None"
+}
+
 
 #find one packge $1 is type, $2 is package name, $3 is index
 gpkg_searchOK()
@@ -184,7 +242,7 @@ gpkg_searchOK()
 	echo -e "\tAvailable:\t $V$R"
 
 	#search installed
-	echo -e "\tInstalled:\t None"
+	gpkg_searchInstalled $1 $2
 
 	#add blank line
 	echo ""
@@ -527,31 +585,7 @@ gpkg_install()
 	fi
 }
 
-#
-# CSV file operation
-#
 
-#split csv line. 
-#input: $1="good,i love u,123"
-#output: count=3, value[0]=good, value[1]="i love u", value[2]=123
-csv_split()
-{
-	count=0
-	local retv=$1
-	unset value
-
-	while [ -n "$retv" ]
-	do
-		value[$count]=${retv%%,*}
-		#echo "value_$count=${value[$count]}"
-
-		retv=${retv#${value[$count]}}
-		retv=${retv#,}
-		#echo "retv=$retv"
-
-		count=$(($count+1))
-	done
-}
 
 
 #
