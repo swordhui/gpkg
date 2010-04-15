@@ -90,7 +90,7 @@ char **argv;
 
 	//Show info. I,Fcount,Dcount,Scount,SpaceUsage,ReadSize
 	printf("I,%d,%d,%d,%ld,%d\n", f_iFCount, f_iDCount, f_iSCount,
-		f_lDiskUsage, (int)(f_llFileSize/1024));
+		f_lDiskUsage/2, (int)((f_llFileSize-1)/1024+1));
 
         return 0;
 }
@@ -135,7 +135,7 @@ int get_info(char* csFileName)
 			t_modify);
 
 		f_iSCount++;
-		f_lDiskUsage+=(info.st_blocks/2);
+		f_lDiskUsage+=info.st_blocks;
 			
 	}
 	else if(S_ISDIR(info.st_mode))
@@ -146,7 +146,7 @@ int get_info(char* csFileName)
 			t_modify);
 
 		f_iDCount++;
-		f_lDiskUsage+=(info.st_blocks/2);
+		f_lDiskUsage+=info.st_blocks;
 	}
 	else
 	{
@@ -159,7 +159,7 @@ int get_info(char* csFileName)
 			t_modify, csTestSum);
 
 		f_iFCount++;
-		f_lDiskUsage+=(info.st_blocks/2);
+		f_lDiskUsage+=info.st_blocks;
 		f_llFileSize+=iTestSize;
 	}
 
