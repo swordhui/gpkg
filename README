@@ -1,1 +1,28 @@
 gpkg : UI interface for Xiange Linux package management system.
+
+to Make
+	make CC_FLAG=xxx
+	default CC_FLAG is "-O2"
+
+to Install
+	make prefix=xxx BASH_PATH=xxx install
+	gpkg and xgfileinfo will be installed to ${prefix}/bin
+	default ${prefix} is ""
+	default ${BASH_PATH} is "${prefix}/bin"
+
+	Sample:
+		make install
+			prefix="", BASH_PATH="/bin"
+			gpkg and xgfileinfo will be installed to /bin
+			gpkg is invoked by "/bin/bash" 
+
+		make prefix=/tools install
+			prefix="/tools", BASH_PATH="/tools/bin"
+			gpkg and xgfileinfo will be installed to /tools/bin
+			gpkg is invoked by "/tools/bin/bash" 
+
+
+		make prefix=/usr BASH_PATH=/bin install
+			prefix="/usr", BASH_PATH="/bin"
+			gpkg and xgfileinfo will be installed to /usr/bin
+			gpkg is invoked by "/bin/bash" 
