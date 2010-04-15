@@ -22,6 +22,7 @@ gpkg_version=0.10.0
 gpkg_usage="
 gpkg $gpkg_version, usage:\n
 	\t-v            \t\tshow current version\n
+	\t--sync [path] \tsync xglibs via git to [path]/var/xiange\n
 	\t-s package 	\tsearch package\n
 	\t-d package 	\tdownload package\n
 	\t-i package 	\tinstall package\n
@@ -396,7 +397,7 @@ gpkg_mkpackage()
 	mv /tmp/file-$N-$V$R $destpath/file
 
 	#tar it.
-	tar cvjpf ../$N-$V$R.tar.bz2 *
+	tar cjpf ../$N-$V$R.tar.bz2 *
 }
 
 gpkg_begininstall()
@@ -411,31 +412,41 @@ gpkg_begininstall()
 	mkdir -p $XGPATH_UNPACK
 	cd $XGPATH_UNPACK
 	xgb_unpack
+	err_check "[Error] call xgb_unpack failed"
 
 	#call config
 	xgb_config
+	err_check "[Error] call xgb_config failed"
 
 	#call build
 	xgb_build
+	err_check "[Error] call xgb_build failed"
 
 	#call install
 	XGPATH_DEST=/tmp/xiange/pack/$N-$V$R
 	rm -rf $XGPATH_DEST
 	mkdir -p $XGPATH_DEST
 	xgb_install
-
+	err_check "[Error] call xgb_install failed"
 	
 	#make package
 	gpkg_mkpackage
-
+	err_check "[Error] make binary package failed"
 
 	#copy to root
-
+	echo "Install files to / ..."
+	tar xf ../$N-$V$R.tar.bz2 -C /
+	err_check "[Error] copy binary package to / failed"
+	echo "Install OK"
+	
 	#post install
+	xgb_postinst
+	err_check "[Error] call xgb_postinst failed"
 
 	#save binary package
 
 	#clean up
+	rm -rf /tmp/xiange
 	return 0
 }
 
@@ -465,6 +476,162 @@ gpkg_install()
 }
 
 #
+# CSV file operation
+#
+
+#split csv line. 
+#input: $1="good,i love u,123"
+#output: count=3, value[0]=good, value[1]="i love u", value[2]=123
+csv_split()
+{
+	count=0
+	local retv=$1
+	unset value
+
+	while [ -n "$retv" ]
+	do
+		value[$count]=${retv%%,*}
+		#echo "value_$count=${value[$count]}"
+
+		retv=${retv#${value[$count]}}
+		retv=${retv#,}
+		#echo "retv=$retv"
+
+		count=$(($count+1))
+	done
+}
+
+
+#
+# remove package
+#
+
+#operations when read a file.
+# l = list files
+# f = remove files/symbol links
+# d = remove directorys
+XG_CSV_OP="l"
+
+gpkg_csvop_ls()
+{
+	case "${value[0]}" in
+	D)
+		#directory
+		printf "%s| %8s| %s\n" "d" "${value[2]}" "${value[1]}"
+		;;
+	S)
+		#Link
+		printf "%s| %8s| %s\n" "l" "${value[2]}" "${value[1]}"
+		;;
+	F)
+		#File
+		printf "%s| %8s| %s\n" " " "${value[2]}" "${value[1]}"
+		;;
+
+	*)
+		#totle
+		printf "\nFile: %s, Dir: %s, Link %d, Size: %dK\n" \
+			"${value[1]}"\
+			"${value[2]}" "${value[3]}" "${value[5]}"
+		;;
+	esac
+	
+}
+
+gpkg_csvop_rm_file()
+{
+	case "${value[0]}" in
+	S)
+		#symbol.
+		rm -f "${value[1]}"
+		printf "Remove link %s\n" "${value[1]}"
+		;;
+	F)
+		#file
+		rm -f "${value[1]}"
+		printf "Remove file %s\n" "${value[1]}"
+		;;
+	esac
+	
+}
+
+gpkg_rm_dir_safe()
+{
+	local files
+
+	files=$(ls "$1" 2>/dev/null)
+	if [ -z "$files" ]; then
+		printf "Remove dir %s\n"  "$1"
+		rm -rf "$1"
+	fi
+}
+
+gpkg_mark_remove()
+{
+	gpkg_mark_remove_array[$mark_count]="$1"
+	mark_count=$(($mark_count+1))
+}
+
+gpkg_reverse_remove()
+{
+	local totle=${#gpkg_mark_remove_array[*]}
+	local i
+
+	for ((i=$(($totle-1)); i>=0; i--))
+	do
+		gpkg_rm_dir_safe "${gpkg_mark_remove_array[$i]}"
+	done
+}
+
+gpkg_csvop_rm_dir()
+{
+	case "${value[0]}" in
+	D)
+		#Directory.
+		gpkg_mark_remove "${value[1]}"
+		;;
+	esac
+}
+
+# read from stdin
+gpkg_read()
+{
+	local line
+	local count
+	local -a value
+
+	while IFS= read -r line
+	do
+		[ -z "$line" ] && continue
+
+		csv_split "$line"
+		case "$XG_CSV_OP" in
+		l)
+			gpkg_csvop_ls
+			;;
+		f)
+			gpkg_csvop_rm_file
+			;;
+		d)
+			gpkg_csvop_rm_dir
+			;;
+		*)
+			gpkg_csvop_ls
+			;;
+		esac
+	done
+}
+
+#read from a file, $1 is file name, $2 is operation
+gpkg_readfile()
+{
+	XG_CSV_OP=$2
+	gpkg_read < $1
+}
+
+
+
+#
 # parse parameters
 #
 case "${1}" in
@@ -485,6 +652,25 @@ case "${1}" in
 
 -i)
 	gpkg_install $2
+	;;
+
+-D)
+	gpkg_readfile $2 "f"
+
+	#reset directory list
+	unset gpkg_mark_remove_array
+	mark_count=0
+
+	#record all directorys
+	gpkg_readfile $2 "d"
+
+	#remove all dirs
+	gpkg_reverse_remove
+	;;
+
+-l)
+	#list files in packet.
+	gpkg_readfile $2 "l"
 	;;
 
 --sync)
