@@ -272,6 +272,9 @@ gpkg_getxgbdirOK()
 	#set script path
 	XGPATH_SCRIPT=$XGPATH_LIB/$1/$2
 
+	#set type
+	T="$1"
+
 	#get the newest one
 	gpkg_getnewest $1/$2
 }
@@ -383,21 +386,68 @@ gpkg_download()
 # Install package
 #
 
+gpkg_rm_dir_safe()
+{
+	local files
+
+	files=$(ls "$1" 2>/dev/null)
+	if [ -z "$files" ]; then
+		printf "Remove dir %s\n"  "$1"
+		rm -rf "$1"
+	fi
+}
+
 gpkg_mkpackage()
 {
-	local destpath=$XGPATH_DEST/var/xiange/db/$N-$V$R
+	local destpath="$XGPATH_DEST/var/xiange/db/$T/$N"
 
-	#copy scripts file
 	mkdir -p $destpath
-	cp $XGPATH_SCRIPT/$N-$V$R.xgb $destpath/build.xgb
+	err_check "[Error] create db directory failed."
 
 	#generate file list
 	cd $XGPATH_DEST
 	find | xgfileinfo > /tmp/file-$N-$V$R
-	mv /tmp/file-$N-$V$R $destpath/file
+	mv /tmp/file-$N-$V$R $destpath/$N-$V$R.file
+	err_check "[Error] move file list failed."
+
+	#copy scripts file
+	cp $XGPATH_SCRIPT/$N-$V$R.xgb $destpath/
+	err_check "[Error] move file list failed."
+
+	#add configuration file
+	echo $XGB_CONFIG > $destpath/$N-$V$R.config
+
+	#date time
+	date +%F,%T > $destpath/$N-$V$R.date
 
 	#tar it.
 	tar cjpf ../$N-$V$R.tar.bz2 *
+}
+
+gpkg_rm_packgeinfo()
+{
+	local destpath=$XGPATH_DEST/var/xiange/db/$T/$N
+
+	#remove config file
+	echo "remove file $destpath/$N-$V$R.config"
+	rm -f $destpath/$N-$V$R.config
+
+	#remove scripts file
+	echo "remove file $destpath/$N-$V$R.xgb"
+	rm -f $destpath/$N-$V$R.xgb
+
+	#remove list file
+	echo "remove file $destpath/$N-$V$R.file"
+	rm -f $destpath/$N-$V$R.file
+
+	#remove date file
+	echo "remove file $destpath/$N-$V$R.file"
+	rm -f $destpath/$N-$V$R.date
+
+	#remove directory
+	gpkg_rm_dir_safe $destpath
+	gpkg_rm_dir_safe $XGPATH_DEST/var/xiange/db/$T
+	gpkg_rm_dir_safe $XGPATH_DEST/var/xiange/db
 }
 
 gpkg_begininstall()
@@ -555,16 +605,7 @@ gpkg_csvop_rm_file()
 	
 }
 
-gpkg_rm_dir_safe()
-{
-	local files
 
-	files=$(ls "$1" 2>/dev/null)
-	if [ -z "$files" ]; then
-		printf "Remove dir %s\n"  "$1"
-		rm -rf "$1"
-	fi
-}
 
 gpkg_mark_remove()
 {
@@ -629,6 +670,59 @@ gpkg_readfile()
 	gpkg_read < $1
 }
 
+#
+# list all installed packages
+#
+
+gpkg_list_inst_info()
+{
+	local files=$(ls $XGPATH/db/$1/$2/*.xgb)
+	local file
+	local count
+	local -a value
+	local t1
+	local t2
+	local tsize
+
+	for file in $files
+	do
+		file=${file##*/}
+		atom_parse $file
+
+		#get date.
+		csv_split `cat $XGPATH/db/$1/$2/$N-$V$R.date`
+		t1=${value[0]}
+		t2=${value[1]}
+
+		#get size, 
+		csv_split `tail -n 1 $XGPATH/db/$1/$2/$N-$V$R.file`
+		tsize=${value[5]}
+
+		printf "%s %s %6sK %s\n" $t1 $t2 $tsize $N-$V$R
+	done
+	
+}
+
+gpkg_list_installed()
+{
+	local gpkg_types
+	local type
+	local gpkg_packs
+	local pack
+	local count=0
+
+	gpkg_types=`ls $XGPATH/db 2>/dev/null`
+	for type in $gpkg_types
+	do
+		gpkg_packs=`ls $XGPATH/db/$type 2>/dev/null`
+		for pack in $gpkg_packs
+		do
+			gpkg_list_inst_info $type $pack	
+		done
+	done
+
+}
+
 
 
 #
@@ -666,6 +760,14 @@ case "${1}" in
 
 	#remove all dirs
 	gpkg_reverse_remove
+
+	#remove infos.
+	#gpkg_rm_packgeinfo
+	;;
+
+-I)
+	#list installed packages, sort by installed time
+	gpkg_list_installed
 	;;
 
 -l)
