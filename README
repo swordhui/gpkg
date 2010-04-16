@@ -27,3 +27,10 @@ to Install
 			prefix="/usr", BASH_PATH="/bin"
 			gpkg and xgfileinfo will be installed to /usr/bin
 			gpkg is invoked by "/bin/bash" 
+
+
+History:
+	0.10.1  2010-04-16,17:53
+
+	1. call xgb_prerm before remove all files/directorys
+	2. add git config when sync xglibs at the first time

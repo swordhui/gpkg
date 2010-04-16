@@ -18,7 +18,7 @@ XGPATH_SCRIPT=$XGPATH_LIB
 #
 # version and  usage 
 #
-gpkg_version=0.10.0
+gpkg_version=0.10.1
 gpkg_usage="
 gpkg $gpkg_version, usage:\n
 	\t-v            \t\tshow current version\n
@@ -835,6 +835,10 @@ gpkg_do_remove_package()
 		xgb_init
 		err_check "call xgb_init failed"
 
+		#call pre rm
+		xgb_prerm
+		err_check "call xgb_prerm failed"
+
 		#remove all files
 		gpkg_readfile $infofile "f"
 
@@ -934,6 +938,8 @@ case "${1}" in
 		git pull
 	else
 		cd ..
+		git config --system --add user.name xguser
+		git config --system --add user.email xguser@xiangelinux.com
 		git clone git://github.com/swordhui/xglibs.git
 	fi
 	;;
