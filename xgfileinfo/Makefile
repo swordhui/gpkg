@@ -1,4 +1,5 @@
-CC_FLAG=-O2
+CC=gcc
+CFLAGS=-O2
 
 
 all: xgfileinfo
@@ -9,7 +10,7 @@ headers=global.h md5.h
 
 
 xgfileinfo: ${sources}
-	gcc ${CC_FLAG}  -o $@ ${sources}
+	${CC} ${CFLAGS}  -o $@ ${sources}
 
 clean:
 	rm -f xgfileinfo

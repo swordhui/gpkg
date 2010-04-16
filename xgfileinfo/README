@@ -2,6 +2,7 @@ xgfileinfo:
 	file recoder tool for Xiange Linux
 
 to Make:
-	make CC_FLAG="XXX"
-	default CC_FLAG is "-O2"
+	make CC="XXX" CFLAGS="XXX"
+	default CFLAGS is "-O2"
+	default CC is "gcc"
 

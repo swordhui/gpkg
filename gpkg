@@ -824,6 +824,17 @@ gpkg_do_remove_package()
 
 		infofile=$XGPATH_SCRIPT/$N-$V$R.file
 
+		#clear xgb_*
+		. $XGPATH_LIB/template.xgb
+		err_check "include xgb template file failed."
+
+		#call init
+		. $XGPATH_SCRIPT/$N-$V$R.xgb
+		err_check "include xgb file failed."
+
+		xgb_init
+		err_check "call xgb_init failed"
+
 		#remove all files
 		gpkg_readfile $infofile "f"
 
@@ -836,6 +847,9 @@ gpkg_do_remove_package()
 
 		#remove all dirs
 		gpkg_reverse_remove
+
+		xgb_postrm
+		err_check "call xgb_postinst failed"
 
 		#remove infos.
 		gpkg_rm_packgeinfo

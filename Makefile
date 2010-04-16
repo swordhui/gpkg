@@ -1,6 +1,7 @@
 prefix=
 BASH_PATH=${prefix}/bin
-CC_FLAG=-O2
+CC=gcc
+CFLAGS=-O2
 
 all: xgfileinfo
 	@echo "Done"
