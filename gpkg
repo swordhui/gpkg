@@ -11,9 +11,11 @@ XGPATH=/var/xiange
 XGPATH_TOOLS=$XGPATH/tools
 XGPATH_LIB=$XGPATH/xglibs
 XGPATH_SOURCE=$XGPATH/sources
+XGPATH_PACKAGE=$XGPATH/packages
+XGPATH_SCRIPT=$XGPATH_LIB
+
 XGPATH_UNPACK=/tmp/xiange/sources
 XGPATH_DEST=/tmp/xiange/pack
-XGPATH_SCRIPT=$XGPATH_LIB
 
 #
 # version and  usage 
@@ -400,6 +402,9 @@ gpkg_begin_download()
 	. $XGPATH_LIB/template.xgb
 	err_check "[Error] $XGPATH_LIB/template.xgb not found."
 
+	#prepare XGB_CONFIG
+	XGB_CONFIG=""
+
 	#include package build scripts
 	. $XGPATH_SCRIPT/$1
 	err_check "[Error] $XGPATH_SCRIPT/$1 not found."
@@ -481,7 +486,10 @@ gpkg_mkpackage()
 	date +%F,%T > $destpath/$N-$V$R.date
 
 	#tar it.
-	tar cjpf ../$N-$V$R.tar.bz2 *
+	mkdir -p $XGPATH_PACKAGE
+	echo "make packages.."
+	tar cjpf $XGPATH_PACKAGE/$N-$V$R.xgp *
+
 }
 
 gpkg_rm_packgeinfo()
@@ -514,7 +522,6 @@ gpkg_begininstall()
 {
 	local ret=0
 
-	#call unpack
 
 	# DO RM WITH CAUTION!! 
 	rm -rf /tmp/xiange/sources
@@ -545,18 +552,17 @@ gpkg_begininstall()
 
 	#copy to root
 	echo "Install files to / ..."
-	tar xf ../$N-$V$R.tar.bz2 -C /
+	tar xjpf $XGPATH_PACKAGE/$N-$V$R.xgp -C /
 	err_check "[Error] copy binary package to / failed"
-	echo "Install OK"
+	echo "Install OK, cleaning up.."
 	
 	#post install
 	xgb_postinst
 	err_check "[Error] call xgb_postinst failed"
 
-	#save binary package
-
 	#clean up
 	rm -rf /tmp/xiange
+	echo "[***] $N-$V$R installed to your system."
 	return 0
 }
 
