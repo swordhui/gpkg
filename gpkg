@@ -12,10 +12,17 @@ XGPATH_TOOLS=$XGPATH/tools
 XGPATH_LIB=$XGPATH/xglibs
 XGPATH_SOURCE=$XGPATH/sources
 XGPATH_PACKAGE=$XGPATH/packages
+XGPATH_DB=$XGPATH/db
 XGPATH_SCRIPT=$XGPATH_LIB
 
 XGPATH_UNPACK=/tmp/xiange/sources
 XGPATH_DEST=/tmp/xiange/pack
+
+#compile parameters
+#CFLAGS="-march=native -mtune=native -O2"
+CFLAGS="-march=native -mtune=native -O2"
+CPPFLAGS="$CFLAGS"
+XGINST_PREFIX="--prefix=/usr"
 
 #
 # version and  usage 
@@ -31,6 +38,7 @@ gpkg $gpkg_version, usage:\n
 	\t-D package 	\tremove package\n
 	\t-I  		\t\tlist installed package\n
 	\t-l package 	\tlist all files in installed package\n
+	\t-ib xgp file	\tinstall binary package to system
 	\n
 XianGe base is at $XGPATH\n
 "
@@ -200,7 +208,7 @@ gpkg_getnewest()
 
 gpkg_searchInstalled()
 {
-	local searchpath=$XGPATH/db/$1/$2	
+	local searchpath=$XGPATH_DB/$1/$2	
 	local findcnt=0
 
 	local files=$(ls $searchpath/*.xgb 2>/dev/null)
@@ -402,8 +410,10 @@ gpkg_begin_download()
 	. $XGPATH_LIB/template.xgb
 	err_check "[Error] $XGPATH_LIB/template.xgb not found."
 
-	#prepare XGB_CONFIG
-	XGB_CONFIG=""
+	#prepare XGB_CONFIG, CFLAGS, CPPFLAGS, XGINST_PREFIX
+	export CFLAGS=$CFLAGS
+	export CPPFLAGS=$CPPFLAGS
+	XGB_CONFIG="$XGINST_PREFIX "
 
 	#include package build scripts
 	. $XGPATH_SCRIPT/$1
@@ -464,14 +474,15 @@ gpkg_rm_dir_safe()
 
 gpkg_mkpackage()
 {
-	local destpath="$XGPATH_DEST/var/xiange/db/$T/$N"
-
-	mkdir -p $destpath
-	err_check "[Error] create db directory failed."
+	local destpath="$XGPATH_DEST/$XGPATH_DB/$T/$N"
 
 	#generate file list
 	cd $XGPATH_DEST
 	find | xgfileinfo > /tmp/file-$N-$V$R
+
+	mkdir -p $destpath
+	err_check "[Error] create db directory failed."
+
 	mv /tmp/file-$N-$V$R $destpath/$N-$V$R.file
 	err_check "[Error] move file list failed."
 
@@ -514,8 +525,8 @@ gpkg_rm_packgeinfo()
 
 	#remove directory
 	gpkg_rm_dir_safe $destpath
-	gpkg_rm_dir_safe /var/xiange/db/$T
-	gpkg_rm_dir_safe /var/xiange/db
+	gpkg_rm_dir_safe $XGPATH_DB/$T
+	gpkg_rm_dir_safe $XGPATH_DB
 }
 
 gpkg_begininstall()
@@ -526,6 +537,7 @@ gpkg_begininstall()
 	# DO RM WITH CAUTION!! 
 	rm -rf /tmp/xiange/sources
 
+	echo "unpacking $N-$V$R..."
 	mkdir -p $XGPATH_UNPACK
 	cd $XGPATH_UNPACK
 	xgb_unpack
@@ -540,6 +552,7 @@ gpkg_begininstall()
 	err_check "[Error] call xgb_build failed"
 
 	#call install
+	echo "installing $N-$V$R..."
 	XGPATH_DEST=/tmp/xiange/pack/$N-$V$R
 	rm -rf $XGPATH_DEST
 	mkdir -p $XGPATH_DEST
@@ -551,7 +564,7 @@ gpkg_begininstall()
 	err_check "[Error] make binary package failed"
 
 	#copy to root
-	echo "Install files to / ..."
+	echo "Moving files to / ..."
 	tar xjpf $XGPATH_PACKAGE/$N-$V$R.xgp -C /
 	err_check "[Error] copy binary package to / failed"
 	echo "Install OK, cleaning up.."
@@ -635,12 +648,12 @@ gpkg_csvop_rm_file()
 	case "${value[0]}" in
 	S)
 		#symbol.
-		rm -f "${value[1]}"
+		unlink "${value[1]}"
 		printf "Remove link %s\n" "${value[1]}"
 		;;
 	F)
 		#file
-		rm -f "${value[1]}"
+		unlink "${value[1]}"
 		printf "Remove file %s\n" "${value[1]}"
 		;;
 	esac
@@ -718,7 +731,7 @@ gpkg_readfile()
 
 gpkg_list_inst_info()
 {
-	local files=$(ls $XGPATH/db/$1/$2/*.xgb)
+	local files=$(ls $XGPATH_DB/$1/$2/*.xgb)
 	local file
 	local count
 	local -a value
@@ -732,12 +745,12 @@ gpkg_list_inst_info()
 		atom_parse $file
 
 		#get date.
-		csv_split `cat $XGPATH/db/$1/$2/$N-$V$R.date`
+		csv_split `cat $XGPATH_DB/$1/$2/$N-$V$R.date`
 		t1=${value[0]}
 		t2=${value[1]}
 
 		#get size, 
-		csv_split `tail -n 1 $XGPATH/db/$1/$2/$N-$V$R.file`
+		csv_split `tail -n 1 $XGPATH_DB/$1/$2/$N-$V$R.file`
 		tsize=${value[5]}
 
 		printf "%s %s %6sK %s\n" $t1 $t2 $tsize $N-$V$R
@@ -753,10 +766,10 @@ gpkg_list_installed()
 	local pack
 	local count=0
 
-	gpkg_types=`ls $XGPATH/db 2>/dev/null`
+	gpkg_types=`ls $XGPATH_DB 2>/dev/null`
 	for type in $gpkg_types
 	do
-		gpkg_packs=`ls $XGPATH/db/$type 2>/dev/null`
+		gpkg_packs=`ls $XGPATH_DB/$type 2>/dev/null`
 		for pack in $gpkg_packs
 		do
 			gpkg_list_inst_info $type $pack	
@@ -767,7 +780,7 @@ gpkg_list_installed()
 
 gpkg_list_showallfile()
 {
-	local files=$(ls $XGPATH/db/$1/$2/*.xgb)
+	local files=$(ls $XGPATH_DB/$1/$2/*.xgb)
 	local file
 	local count
 	local -a value
@@ -780,7 +793,7 @@ gpkg_list_showallfile()
 		file=${file##*/}
 		atom_parse $file
 
-		gpkg_readfile "$XGPATH/db/$1/$2/$N-$V$R.file" "l"
+		gpkg_readfile "$XGPATH_DB/$1/$2/$N-$V$R.file" "l"
 	done
 
 }
@@ -793,10 +806,10 @@ gpkg_list_package()
 	local pack
 	local findcount=0
 
-	gpkg_types=`ls $XGPATH/db 2>/dev/null`
+	gpkg_types=`ls $XGPATH_DB 2>/dev/null`
 	for type in $gpkg_types
 	do
-		gpkg_packs=`ls $XGPATH/db/$type 2>/dev/null`
+		gpkg_packs=`ls $XGPATH_DB/$type 2>/dev/null`
 		for pack in $gpkg_packs
 		do
 			if [ "$pack" == "$1" ]; then
@@ -812,7 +825,7 @@ gpkg_list_package()
 
 gpkg_do_remove_package()
 {
-	local files=$(ls $XGPATH/db/$1/$2/*.xgb)
+	local files=$(ls $XGPATH_DB/$1/$2/*.xgb)
 	local file
 	local count
 	local -a value
@@ -826,7 +839,7 @@ gpkg_do_remove_package()
 		file=${file##*/}
 		atom_parse $file
 		T=$1
-		XGPATH_SCRIPT=$XGPATH/db/$1/$2
+		XGPATH_SCRIPT=$XGPATH_DB/$1/$2
 
 		infofile=$XGPATH_SCRIPT/$N-$V$R.file
 
@@ -877,10 +890,10 @@ gpkg_remove_package()
 	local pack
 	local findcount=0
 
-	gpkg_types=`ls $XGPATH/db 2>/dev/null`
+	gpkg_types=`ls $XGPATH_DB 2>/dev/null`
 	for type in $gpkg_types
 	do
-		gpkg_packs=`ls $XGPATH/db/$type 2>/dev/null`
+		gpkg_packs=`ls $XGPATH_DB/$type 2>/dev/null`
 		for pack in $gpkg_packs
 		do
 			if [ "$pack" == "$1" ]; then
@@ -893,6 +906,63 @@ gpkg_remove_package()
 
 	[ "$findcount" == "0" ] && echo "package $1 not found"
 }
+
+gpkg_install_binary_package()
+{
+	local xgbfile
+	local atom
+	local dbpath
+
+	dbpath=${XGPATH_DB#/}
+
+	echo "parsing $1..."
+	#fine xgbfile in package.
+	xgbfile=$(tar tf "$1" | grep "^$dbpath/.*\.xgb")
+	err_check "get info from xgb file failed."
+
+	#check xgb
+	[ -z "$xgbfile" ] && echo "Not xgp format" && exit 1
+
+	xgbfile=${xgbfile#$dbpath}
+	xgbfile=${xgbfile#/}
+	T=${xgbfile%%/*}
+	[ -z "$T" ] && echo "Not xgp format" && exit 1
+
+	atom=${xgbfile##*/}
+	atom_parse "$atom"
+
+	echo "installing $T/$N-$V$R ..."
+
+	#copy to root
+	echo "Moving files to / ..."
+	tar xjpf "$1" -C /
+	err_check "[Error] copy binary package to / failed"
+	echo "Install OK, cleaning up.."
+
+	#clear all routines by include template file
+	. $XGPATH_LIB/template.xgb
+	err_check "[Error] $XGPATH_LIB/template.xgb not found."
+
+	#prepare XGB_CONFIG
+	export CFLAGS=$CFLAGS
+	export CPPFLAGS=$CPPFLAGS
+	XGB_CONFIG="$XGINST_PREFIX "
+
+	#include package build scripts
+	XGPATH_SCRIPT=$XGPATH_DB/$T/$N
+	. $XGPATH_SCRIPT/$N-$V$R.xgb
+	err_check "[Error] $XGPATH_SCRIPT/$1 not found."
+
+	#init build script file
+	xgb_init
+
+	#post install
+	xgb_postinst
+	err_check "[Error] call xgb_postinst failed"
+
+	echo "[OK] Binary package $N-$V$R installed to you system."
+}
+
 #
 # parse parameters
 #
@@ -929,6 +999,9 @@ case "${1}" in
 -l)
 	#list files in packet.
 	gpkg_list_package "$2"
+	;;
+-ib)
+	gpkg_install_binary_package "$2"
 	;;
 
 --sync)
