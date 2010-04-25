@@ -23,6 +23,7 @@ XGPATH_DEST=/tmp/xiange/pack
 CFLAGS="-march=native -mtune=native -O2"
 CPPFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
+XG_I18N="en zh_CN"
 
 #
 # version and  usage 
@@ -472,9 +473,76 @@ gpkg_rm_dir_safe()
 	fi
 }
 
+#strip unnessesary i18n in path $1
+gpkg_strip_i18n()
+{
+	local ipath="$1/locale"
+	local i18ns=$(ls $ipath 2>/dev/null)
+	local name
+
+	for i in $i18ns
+	do
+		name=${i##*/}
+		str_isIn "$XG_I18N" $name 
+		if [ "$?" == "0" ]; then
+			#not in XG_I18N, remove.
+			echo ">>> strip i18n $name.."
+			rm -rf $ipath/$name
+		fi
+	done
+}
+
+#strip binary in directory $1
+gpkg_stip_bin()
+{
+	echo ">>> strip debug info.."
+	find $1/{,usr/}{bin,sbin} -type f \
+  		-exec strip --strip-all '{}' ';' 2>/dev/null
+
+	find $1/{,usr/}lib -type f \
+  		-exec strip --strip-debug '{}' ';' 2>/dev/null
+}
+
+#compress man docs
+gpkg_gzip_man()
+{
+	echo ">>> compress man docs.."
+	find $1/usr/{,share/}man -type f \
+  		-exec gzip '{}' ';' 2>/dev/null
+}
+
+#compress info docs
+gpkg_gzip_info()
+{
+	local ipath=""
+
+	[ -d $1/usr/share/info ] && ipath=$1/usr/share/info
+	[ -d $1/usr/info ] && ipath=$1/usr/info
+
+	#quit if not found
+	[ -z "$ipath" ] && return 0
+
+	echo ">>> compress $ipath"
+
+	#first, rename dir.
+	[ -f ${ipath}/dir ] && mv ${ipath}/{dir,dir-$N.info}
+	find $ipath -type f \
+  		-exec gzip '{}' ';' 2>/dev/null
+}
+
 gpkg_mkpackage()
 {
 	local destpath="$XGPATH_DEST/$XGPATH_DB/$T/$N"
+
+	#strip i18n
+	gpkg_strip_i18n $XGPATH_DEST/usr/share
+
+	#strip bin
+	gpkg_stip_bin $XGPATH_DEST
+
+	#compress man docs
+	gpkg_gzip_man $XGPATH_DEST
+	gpkg_gzip_info $XGPATH_DEST
 
 	#generate file list
 	cd $XGPATH_DEST
@@ -485,6 +553,9 @@ gpkg_mkpackage()
 
 	mv /tmp/file-$N-$V$R $destpath/$N-$V$R.file
 	err_check "[Error] move file list failed."
+
+	#test result.
+	mv /tmp/xiange/$N-$V$R.test $destpath
 
 	#copy scripts file
 	cp $XGPATH_SCRIPT/$N-$V$R.xgb $destpath/
@@ -519,6 +590,10 @@ gpkg_rm_packgeinfo()
 	echo "remove file $destpath/$N-$V$R.file"
 	rm -f $destpath/$N-$V$R.file
 
+	#remove test file.
+	echo "remove file $destpath/$N-$V$R.test"
+	rm -f $destpath/$N-$V$R.test
+
 	#remove date file
 	echo "remove file $destpath/$N-$V$R.file"
 	rm -f $destpath/$N-$V$R.date
@@ -551,8 +626,11 @@ gpkg_begininstall()
 	xgb_build
 	err_check "[Error] call xgb_build failed"
 
+	#check if possiable, and ignore result
+	#store information to /tmp/xiange/$N-$V$R.test
+	xgb_check | tee /tmp/xiange/$N-$V$R.test
+
 	#call install
-	echo "installing $N-$V$R..."
 	XGPATH_DEST=/tmp/xiange/pack/$N-$V$R
 	rm -rf $XGPATH_DEST
 	mkdir -p $XGPATH_DEST
