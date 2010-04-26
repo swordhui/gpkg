@@ -21,6 +21,10 @@ install: FORCE
 	@echo "Done"
 
 test: FORCE
+	@bash gpkg selftest
+	
+
+testinst: FORCE
 	@mkdir ./test
 	make prefix=./test BASH_PATH=/bin install
 	@echo "Done"

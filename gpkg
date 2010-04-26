@@ -95,6 +95,17 @@ atom_parse()
 	N="${N%-}"
 }
 
+#parse with type, such as "app-sys/vim-2.3.5"
+atom_parse_type()
+{
+	local ATOM
+
+	T=${1%/*}
+	ATOM=${1#*/}
+
+	atom_parse "$ATOM"
+}
+
 #compare 2 versions, such 2.6.9 and 2.6.10
 #return 0 if same. 
 #return 1 if $1 is grater than $2 
@@ -182,16 +193,29 @@ gpkg_get_packages()
 	gpkg_packs=`ls $XGPATH_LIB/$1 2>/dev/null`
 }
 
-#Get Newest file in $XGPATH_LIB/$1
-gpkg_getnewest()
+# Get Newest xgb file in path $1
+# $2 is specified version, can be ""
+# $3 is specified re-version, can be ""
+# if $2 is "", return the newest xgb file
+gpkg_getnewest_xgb()
 {
 	local files
 	local file
+	local N
+	local V
+	local R
 	newest=""
 
-	files=`ls $XGPATH_LIB/$1 2>/dev/null`
+	files=`ls $1/*.xgb 2>/dev/null`
 	for file in $files
 	do
+		#compare $2
+		if [ -n "$2" ]; then
+			atom_parse $file
+			if [ "$N"
+		fi
+
+
 		if [ -z $newest ]; then
 			newest=$file
 			#echo "First is $file"
@@ -333,9 +357,8 @@ check_and_download()
 
 
 
-#get xgb file based on package name in $1
+#return xgb file based on package name in $1
 #set $XGPATH_SCRIPT and return value in $newest
-
 #call when decided package xgb directory
 gpkg_getxgbdirOK()
 {
@@ -349,6 +372,11 @@ gpkg_getxgbdirOK()
 	gpkg_getnewest $1/$2
 }
 
+# return specifid xgb files in $newest.
+# $1 is package name.
+# $2 is package type, can be ""
+# $3 is package version, can be ""
+# $3 is package reversion, can be ""
 gpkg_getxgbfile()
 {
 	local gpkg_types
@@ -359,7 +387,14 @@ gpkg_getxgbfile()
 	local -a retType
 	local -a retPack
 
-	gpkg_get_types
+	#get all types
+	if [ -z "$2" ]; then
+		#no type specified
+		gpkg_get_types
+	else
+		gpkg_types="$2"
+	fi
+
 	for type in $gpkg_types
 	do
 		gpkg_get_packages $type
@@ -696,10 +731,24 @@ gpkg_begininstall()
 	return 0
 }
 
+#install packge. $1 is atom with type, such as "app-editors/vim-7.2.404"
+#or only name with version, such as "vim-7.2.404"
+#or only name, such as "vim"
 gpkg_install()
 {
 	local newest
 	local ret
+	local itype
+	local iname
+	local iver
+	local irver
+
+	#parse input 
+	atom_parse_type $1
+	itype=$T
+	iname=$N
+	iver=$V
+	irver=$R
 
 	#get xgb file
 	gpkg_getxgbfile $1
@@ -1138,6 +1187,13 @@ case "${1}" in
 		git config --system --add user.email xguser@xiangelinux.com
 		git clone git://github.com/swordhui/xglibs.git
 	fi
+	;;
+
+selftest)
+	#include test file
+	. gpkg-test
+	err_check "[Error] self test not surpport"
+	gpkg_test_bgin
 	;;
 
 *)

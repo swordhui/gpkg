@@ -1,0 +1,174 @@
+#!/bin/bash
+
+test_cnt_ok=0
+test_cnt_failed=0
+test_cnt=0
+
+test_ok()
+{
+	printf "PASS\n"
+	((test_cnt_ok++))
+}
+
+test_failed()
+{
+	printf "FAILED\n"
+	((test_cnt_failed++))
+}
+
+test_showtitle()
+{
+	((test_cnt++))
+	printf "%3d. %-60s" $test_cnt "$1"
+}
+
+test_showResult()
+{
+	local ret=$?
+
+	if [ "$ret" == "0" ]; then
+		$1
+	else
+		$2
+	fi
+
+	return $?
+}
+
+gpkg_test_bgin()
+{
+	local T
+	local N
+	local V
+	local R
+
+	test_showtitle "str_isIn normal..." 
+	str_isIn "abcde" "bcd"
+	test_showResult test_failed test_ok
+
+
+	test_showtitle "str_isIn reverse..."
+	str_isIn "abcde" "bcdef"
+	test_showResult test_ok test_failed
+
+	test_showtitle "str_isIn regex..."
+	str_isIn "man8" "man[1-9]"
+	test_showResult test_failed test_ok
+
+	test_showtitle "atom parse 1..."
+	atom_parse "vim-2.8.9.xgb"
+	if [ "$N" == "vim" -a "$V" == "2.8.9" -a "$R" == "" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#test 2
+	test_showtitle "atom parse 2..."
+	N=""
+	V=""
+	R=""
+	atom_parse "vim-2.8.9-r15"
+	if [ "$N" == "vim" -a "$V" == "2.8.9" -a "$R" == "-r15" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#test 2
+	test_showtitle "atom parse 3..."
+	N=""
+	V=""
+	R=""
+	atom_parse "x-org-base-7-r1.xgb"
+	if [ "$N" == "x-org-base" -a "$V" == "7" -a "$R" == "-r1" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#test 4
+	test_showtitle "atom parse 4..."
+	N=""
+	V=""
+	R=""
+	atom_parse "x-org-r203a-7.xgb"
+	if [ "$N" == "x-org-r203a" -a "$V" == "7" -a "$R" == "" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#atom type parse
+	test_showtitle "atom type parse ..."
+	T=""
+	N=""
+	V=""
+	R=""
+	atom_parse_type "app-sys/x-org-7.4"
+	if [ "$T" == "app-sys" -a "$N" == "x-org" -a "$V" == "7.4" -a "$R" == "" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#atom ver compare
+	test_showtitle "version compare 1..."
+	atom_vercmp "7.1" "7.2"
+	if [ "$?" == "2" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#atom ver compare
+	test_showtitle "version compare 2..."
+	atom_vercmp "7.5" "7.2"
+	if [ "$?" == "1" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#atom ver compare
+	test_showtitle "version compare 3..."
+	atom_vercmp "7.9.5.8.10" "7.9.5.8.10"
+	if [ "$?" == "0" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#atom ver compare
+	test_showtitle "version compare 4..."
+	atom_vercmp "7.9" "7.10"
+	if [ "$?" == "2" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	test_showtitle "atom compare 1..."
+	atom_cmp "vim-7.9.xgb" "vim-7.10.xgb"
+	if [ "$?" == "2" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	test_showtitle "atom compare 2..."
+	atom_cmp "vim-7.10.xgb" "vim-7.9.xgb"
+	if [ "$?" == "1" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	test_showtitle "atom compare 3..."
+	atom_cmp "vim-7.10.xgb" "vim-7.10.xgb"
+	if [ "$?" == "0" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+}
