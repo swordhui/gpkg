@@ -19,7 +19,6 @@ XGPATH_UNPACK=/tmp/xiange/sources
 XGPATH_DEST=/tmp/xiange/pack
 
 #compile parameters
-#CFLAGS="-march=native -mtune=native -O2"
 CFLAGS="-march=native -mtune=native -O2 -fomit-frame-pointer -pipe"
 CPPFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
@@ -582,18 +581,24 @@ gpkg_mkpackage()
 	mkdir -p $destpath
 	err_check "[Error] create db directory failed."
 
+	#file list
 	mv /tmp/file-$N-$V$R $destpath/$N-$V$R.file
 	err_check "[Error] move file list failed."
 
-	#test result.
+	#configure result and zip it.
+	mv /tmp/xiange/$N-$V$R.config $destpath
+	gzip $destpath/$N-$V$R.config
+
+	#test result and zip it.
 	mv /tmp/xiange/$N-$V$R.test $destpath
+	gzip $destpath/$N-$V$R.test
 
 	#copy scripts file
 	cp $XGPATH_SCRIPT/$N-$V$R.xgb $destpath/
 	err_check "[Error] move file list failed."
 
-	#add configuration file
-	echo $XGB_CONFIG > $destpath/$N-$V$R.config
+	#add configuration parameters
+	echo $XGB_CONFIG > $destpath/$N-$V$R.para
 
 	#date time
 	date +%F,%T > $destpath/$N-$V$R.date
@@ -612,6 +617,8 @@ gpkg_rm_packgeinfo()
 	#remove config file
 	echo "remove file $destpath/$N-$V$R.config"
 	rm -f $destpath/$N-$V$R.config
+	rm -f $destpath/$N-$V$R.config.gz
+	rm -f $destpath/$N-$V$R.para
 
 	#remove scripts file
 	echo "remove file $destpath/$N-$V$R.xgb"
@@ -624,6 +631,7 @@ gpkg_rm_packgeinfo()
 	#remove test file.
 	echo "remove file $destpath/$N-$V$R.test"
 	rm -f $destpath/$N-$V$R.test
+	rm -f $destpath/$N-$V$R.test.gz
 
 	#remove date file
 	echo "remove file $destpath/$N-$V$R.file"
@@ -649,8 +657,8 @@ gpkg_begininstall()
 	xgb_unpack
 	err_check "[Error] call xgb_unpack failed"
 
-	#call config
-	xgb_config
+	#call config and store config result
+	xgb_config | tee /tmp/xiange/$N-$V$R.config
 	err_check "[Error] call xgb_config failed"
 
 	#call build
