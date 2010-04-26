@@ -20,7 +20,7 @@ XGPATH_DEST=/tmp/xiange/pack
 
 #compile parameters
 #CFLAGS="-march=native -mtune=native -O2"
-CFLAGS="-march=native -mtune=native -O2"
+CFLAGS="-march=native -mtune=native -O2 -fomit-frame-pointer -pipe"
 CPPFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
 XG_I18N="en zh_CN"
@@ -492,6 +492,32 @@ gpkg_strip_i18n()
 	done
 }
 
+#strip unnessesary i18n in man path.
+gpkg_strip_mani18n()
+{
+	local ipath="$1/man"
+	local i18ns=$(ls $ipath 2>/dev/null)
+	local name
+
+	for i in $i18ns
+	do
+		name=${i##*/}
+
+		#skip man1 -- man9
+		str_isIn "$name" "man"
+		if [ "$?" == "1" ]; then
+			continue
+		fi
+
+		str_isIn "$XG_I18N" $name 
+		if [ "$?" == "0" ]; then
+			#not in XG_I18N, remove.
+			echo ">>> strip man-i18n $name.."
+			rm -rf $ipath/$name
+		fi
+	done
+}
+
 #strip binary in directory $1
 gpkg_stip_bin()
 {
@@ -537,8 +563,13 @@ gpkg_mkpackage()
 	#strip i18n
 	gpkg_strip_i18n $XGPATH_DEST/usr/share
 
+	#strip man i18n pages
+	gpkg_strip_mani18n $XGPATH_DEST/usr
+	gpkg_strip_mani18n $XGPATH_DEST/usr/share
+
 	#strip bin
 	gpkg_stip_bin $XGPATH_DEST
+
 
 	#compress man docs
 	gpkg_gzip_man $XGPATH_DEST
