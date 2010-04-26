@@ -193,29 +193,16 @@ gpkg_get_packages()
 	gpkg_packs=`ls $XGPATH_LIB/$1 2>/dev/null`
 }
 
-# Get Newest xgb file in path $1
-# $2 is specified version, can be ""
-# $3 is specified re-version, can be ""
-# if $2 is "", return the newest xgb file
-gpkg_getnewest_xgb()
+#Get Newest file in $XGPATH_LIB/$1
+gpkg_getnewest()
 {
 	local files
 	local file
-	local N
-	local V
-	local R
 	newest=""
 
-	files=`ls $1/*.xgb 2>/dev/null`
+	files=`ls $XGPATH_LIB/$1 2>/dev/null`
 	for file in $files
 	do
-		#compare $2
-		if [ -n "$2" ]; then
-			atom_parse $file
-			if [ "$N"
-		fi
-
-
 		if [ -z $newest ]; then
 			newest=$file
 			#echo "First is $file"
