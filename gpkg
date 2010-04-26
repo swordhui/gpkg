@@ -762,7 +762,6 @@ gpkg_begininstall()
 {
 	local ret=0
 
-
 	# DO RM WITH CAUTION!! 
 	rm -rf /tmp/xiange/sources
 
@@ -773,8 +772,15 @@ gpkg_begininstall()
 	err_check "[Error] call xgb_unpack failed"
 
 	#call config and store config result
-	xgb_config | tee /tmp/xiange/$N-$V$R.config
-	err_check "[Error] call xgb_config failed"
+	mkfifo /tmp/xiange/$N-$V$R.pipe
+	tee /tmp/xiange/$N-$V$R.config < /tmp/xiange/$N-$V$R.pipe & 
+	xgb_config >  /tmp/xiange/$N-$V$R.pipe
+	if [ "$?" != "0" ]; then
+		sleep 1
+		echo "[Error] call xgb_config failed"
+		rm -f /tmp/xiange/$N-$V$R.pipe
+		exit 1
+	fi
 
 	#call build
 	xgb_build
@@ -782,7 +788,9 @@ gpkg_begininstall()
 
 	#check if possiable, and ignore result
 	#store information to /tmp/xiange/$N-$V$R.test
-	xgb_check | tee /tmp/xiange/$N-$V$R.test
+	mkfifo /tmp/xiange/$N-$V$R.pipe2
+	tee /tmp/xiange/$N-$V$R.test < /tmp/xiange/$N-$V$R.pipe2 & 
+	xgb_check > /tmp/xiange/$N-$V$R.pipe2
 
 	#call install
 	XGPATH_DEST=/tmp/xiange/pack/$N-$V$R
@@ -961,6 +969,23 @@ gpkg_read()
 			gpkg_csvop_ls
 			;;
 		esac
+	done
+}
+
+#read from file, and do it one by one
+#$1 is total count.
+gpkg_do_stage1()
+{
+	local line
+	local count
+
+	while IFS= read -r line
+	do
+		[ -z "$line" ] && continue
+		((count++))
+		echo -e "\n*** $count/$1 *** installing $line..\n"
+		gpkg -i $line
+		[ "$?" != "0" ] && break
 	done
 }
 
@@ -1274,6 +1299,12 @@ selftest)
 	. gpkg-test
 	err_check "[Error] self test not surpport"
 	gpkg_test_bgin
+	;;
+
+stage1)
+	#read from list, and install it one by one.
+	lines=$(wc -l $XGPATH_LIB/stages/stage1)
+	gpkg_do_stage1 $lines  < $XGPATH_LIB/stages/stage1
 	;;
 
 *)
