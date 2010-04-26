@@ -99,6 +99,7 @@ gpkg_test_bgin()
 		test_failed
 	fi
 
+
 	#atom type parse
 	test_showtitle "atom type parse ..."
 	T=""
@@ -106,7 +107,33 @@ gpkg_test_bgin()
 	V=""
 	R=""
 	atom_parse_type "app-sys/x-org-7.4"
-	if [ "$T" == "app-sys" -a "$N" == "x-org" -a "$V" == "7.4" -a "$R" == "" ]; then
+	if [ "$T" == "app-sys" -a "$N" == "x-org-7.4" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#atom type parse 2
+	test_showtitle "atom type parse 2 ..."
+	T=""
+	N=""
+	V=""
+	R=""
+	atom_parse_type "x-org-7.4"
+	if [ "$T" == "" -a "$N" == "x-org-7.4" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#atom type parse 3
+	test_showtitle "atom type parse 3 ..."
+	T=""
+	N=""
+	V=""
+	R=""
+	atom_parse_type "app-sys/"
+	if [ "$T" == "app-sys" -a "$N" == "" ]; then
 		test_ok
 	else
 		test_failed
@@ -167,6 +194,20 @@ gpkg_test_bgin()
 	test_showtitle "atom compare 3..."
 	atom_cmp "vim-7.10.xgb" "vim-7.10.xgb"
 	if [ "$?" == "0" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#xgb path test.
+	test_showtitle "atom path parse ..."
+	T=""
+	N=""
+	V=""
+	R=""
+	atom_parse_path "/var/xiange/db/app-sys/vim/vim-7.0.401-r1.xgb"
+	if [ "$T" == "app-sys" -a "$N" == "vim" -a "$V" == "7.0.401" \
+		-a "$R" == "-r1" ]; then
 		test_ok
 	else
 		test_failed

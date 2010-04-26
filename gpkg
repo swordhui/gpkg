@@ -96,14 +96,25 @@ atom_parse()
 }
 
 #parse with type, such as "app-sys/vim-2.3.5"
+#return type and name. 
 atom_parse_type()
 {
-	local ATOM
+	N=${1##*/}
+	T=${1%$N}
+	T=${T%/}
+}
 
+#parse with path, suchas "/var/xiange/db/app-editor/vim/vim-7.2.401.xgb"
+atom_parse_path()
+{
+	local atom
+
+	atom=${1##*/}
 	T=${1%/*}
-	ATOM=${1#*/}
+	T=${T%/*}
+	T=${T##*/}
 
-	atom_parse "$ATOM"
+	atom_parse "$atom"
 }
 
 #compare 2 versions, such 2.6.9 and 2.6.10
@@ -152,6 +163,30 @@ atom_cmp()
 	atom_vercmp $V1 $V
 }
 
+#compare 2 atoms pth, such as /var/xiange/sys/linux-2.6.9.xgb and linux-2.6.10.xgb
+#return 0 if same. 
+#return 1 if $1 is grater than $2 
+#return 2 if $1 is lesser then $2
+atom_cmp_path()
+{
+	local R1
+	local V1
+	local N1
+
+	#echo "Begin Compare: $1 $2"
+
+	atom_parse_path $1
+	R1=$R
+	V1=$V
+	N1=$N
+	#echo "N1=$N1, V1=$V1, R1=$R1"
+
+	atom_parse_path $2
+	#echo "N2=$N, V2=$V, R2=$R"
+
+	#compare version
+	atom_vercmp $V1 $V
+}
 #
 # CSV file operation
 #
@@ -193,14 +228,15 @@ gpkg_get_packages()
 	gpkg_packs=`ls $XGPATH_LIB/$1 2>/dev/null`
 }
 
-#Get Newest file in $XGPATH_LIB/$1
+#Get Newest file in dir $1
+#return path of the newest on in $newest
 gpkg_getnewest()
 {
 	local files
 	local file
 	newest=""
 
-	files=`ls $XGPATH_LIB/$1 2>/dev/null`
+	files=`ls $1/*.xgb 2>/dev/null`
 	for file in $files
 	do
 		if [ -z $newest ]; then
@@ -209,10 +245,30 @@ gpkg_getnewest()
 		else
 			#compare 
 			#echo "compare $file $newest"
-			atom_cmp $file $newest
+			atom_cmp_path $file $newest
 			[ "$?" == "1" ] && newest=$file
 			#echo "after compare: new=$newest"
 
+		fi
+	done
+}
+
+#get all xgb versions, ret to $allver
+#$1 is path 
+gpkg_getallxgbver()
+{
+	local files
+	local file
+	allver=""
+
+	files=`ls -t $1/*.xgb 2>/dev/null`
+	for file in $files
+	do
+		atom_parse_path $file
+		if [ -z "$allver" ]; then
+			allver="$V$R"
+		else
+			allver+=" | $V$R"
 		fi
 	done
 }
@@ -243,7 +299,7 @@ gpkg_searchInstalled()
 		csv_split `tail -n 1 $searchpath/$N-$V$R.file`
 		tsize=${value[5]}
 
-		printf "\tInstalled:\t %s  | %s %s %sK\n" $V$R $t1 $t2 $tsize 
+		printf "\tInstalled: %s | %s %s %sK\n" $V$R $t1 $t2 $tsize 
 		findcnt=$(($findcnt+1))
 	done
 
@@ -254,13 +310,14 @@ gpkg_searchInstalled()
 #find one packge $1 is type, $2 is package name, $3 is index
 gpkg_searchOK()
 {
+	local allver
+
 	#show it.
 	echo "* $1/$2"
 
 	#get newest version
-	gpkg_getnewest $1/$2
-	atom_parse $newest
-	echo -e "\tAvailable:\t $V$R"
+	gpkg_getallxgbver $XGPATH_LIB/$1/$2
+	echo -e "\tAvailable: $allver"
 
 	#search installed
 	gpkg_searchInstalled $1 $2
@@ -269,29 +326,53 @@ gpkg_searchOK()
 	echo ""
 }
 
+#Search, $1 is atom with path, such as app-sys/linux
+#or input linux only.
 gpkg_search()
 {
-	local gpkg_types
-	local type
-	local gpkg_packs
+	local results
 	local pack
 	local count=0
+	local iname
+	local lastiname=""
+	local lastitype=""
 
-	gpkg_get_types
-	for type in $gpkg_types
+	#echo "p1=$1"
+
+	#parae input files
+	atom_parse_type $1
+
+	#echo "N=$N, T=$T"
+
+	#find what?
+	if [ "$N" == "" ]; then
+		iname="*.xgb"
+	else
+		iname="*$N*.xgb"
+	fi
+
+	#type?
+	if [ -n "$T" ]; then
+		results=$(find $XGPATH_LIB -iname "$iname" | grep "/$T/")
+	else
+		results=$(find $XGPATH_LIB -iname "$iname")
+	fi
+
+	for pack in $results
 	do
-		gpkg_get_packages $type
-		for pack in $gpkg_packs
-		do
-			str_isIn $pack $1
-			if [ $? == 1 ]; then
-				#find one.
-				count=$(($count + 1))
-				gpkg_searchOK $type $pack $count
-			fi
-		done
+		atom_parse_path $pack
+
+		#check same with the last one?
+		if [ "$T" == "$lastitype" -a "$N" == "$lastiname" ]; then
+			#skip.
+			continue
+		fi
+
+		count=$(($count + 1))
+		lastitype=$T
+		lastiname=$N
+		gpkg_searchOK $T $N $count
 	done
-	echo "search $1, result count $count"
 }
 
 
@@ -342,82 +423,93 @@ check_and_download()
 }
 
 
-
-
-#return xgb file based on package name in $1
-#set $XGPATH_SCRIPT and return value in $newest
-#call when decided package xgb directory
-gpkg_getxgbdirOK()
-{
-	#set script path
-	XGPATH_SCRIPT=$XGPATH_LIB/$1/$2
-
-	#set type
-	T="$1"
-
-	#get the newest one
-	gpkg_getnewest $1/$2
-}
-
-# return specifid xgb files in $newest.
-# $1 is package name.
-# $2 is package type, can be ""
-# $3 is package version, can be ""
-# $3 is package reversion, can be ""
+# return specifid xgb files in $newest, with full path
+# $1 is file atom with type, such as "sys-app/vim-7.2.404"
 gpkg_getxgbfile()
 {
-	local gpkg_types
-	local type
-	local gpkg_packs
+	local results
 	local pack
 	local count=0
-	local -a retType
-	local -a retPack
+	local iname
 
-	#get all types
-	if [ -z "$2" ]; then
-		#no type specified
-		gpkg_get_types
+	#echo "p1=$1"
+
+	#parae input files
+	atom_parse_type $1
+
+	#echo "N=$N, T=$T"
+
+	#find what?
+	if [ "$N" == "" ]; then
+		echo "No package specified."
+		echo "Sample: "
+		echo -e "\tgpkg -i vim"
+		echo -e "\tgpkg -i vim-7.2.404"
+		echo -e "\tgpkg -i app-editors/vim-7.2.404"
+		return 1
 	else
-		gpkg_types="$2"
+		iname="$N"
 	fi
 
-	for type in $gpkg_types
+	#type?
+	if [ -n "$T" ]; then
+		results=$(find $XGPATH_LIB -type d -iname "$iname" | grep "/$T/")
+	else
+		results=$(find $XGPATH_LIB -type d -iname "$iname")
+	fi
+
+	for pack in $results
 	do
-		gpkg_get_packages $type
-		for pack in $gpkg_packs
-		do
-			if [ $1 == $pack ]; then
-				#find 
-				retType[$count]=$type
-				retPack[$count]=$pack
-				count=$(($count + 1))
-			fi
-		done
+		#atom_parse_path $pack
+		count=$(($count + 1))
+		#echo "$count $pack"
 	done
-	
-	#check result.
-	if [ "$count" == "0" ]; then
-		#not found
-		echo "Not Found"
+
+	if [ "$count" == "1" ]; then
+		#found 1.
+		gpkg_getnewest $results
+		return 0
+	fi
+
+	if [ "$count"0 -gt 10 ]; then
+		#more results
+		echo "Too more results"
 		return 1
 	fi
 
-	if [ "$count" == "1" ]; then
-		#OK, decide directory
-		gpkg_getxgbdirOK ${retType[0]} ${retPack[0]}
-		#echo $newest
-		return 
+	#no results. search xgbfile
+	if [ -n "$T" ]; then
+		results=$(find $XGPATH_LIB  -iname "$N.xgb" | grep "/$T/")
+	else
+		results=$(find $XGPATH_LIB  -iname "$N.xgb")
 	fi
 
-	#find more, show and select.
-	echo "More result, $count, please select 1"
+	count=0
+	for pack in $results
+	do
+		#atom_parse_path $pack
+		count=$(($count + 1))
+		#echo "$count $pack"
+	done
 
-	unset retType
-	unset retPack
+	if [ "$count" == "1" ]; then
+		#found 1.
+		newest=$results
+		return 0
+	fi
+
+	if [ "$count"0 -gt 10 ]; then
+		#more results
+		echo "Too more results"
+		return 1
+	fi
+
+	echo "Not found."
+	return 2
 }
 
-#begin download, $1 is atom, such as autoconf-2.63-r1.xgb
+#begin download, $1 is atom with path,  such as 
+#/var/sys-app/autoconf/autoconf-2.63-r1.xgb
 gpkg_begin_download()
 {
 	local url
@@ -425,7 +517,7 @@ gpkg_begin_download()
 	#echo "begin download from $XGPATH_SCRIPT/$1"
 
 	#find newest version.
-	atom_parse $1
+	atom_parse_path $1
 	echo "Begin download $N-$V$R..."
 
 	#clear all routines by include template file
@@ -436,9 +528,10 @@ gpkg_begin_download()
 	export CFLAGS=$CFLAGS
 	export CPPFLAGS=$CPPFLAGS
 	XGB_CONFIG="$XGINST_PREFIX "
+	XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
 
 	#include package build scripts
-	. $XGPATH_SCRIPT/$1
+	. $1
 	err_check "[Error] $XGPATH_SCRIPT/$1 not found."
 
 	#init build script file
@@ -468,7 +561,7 @@ gpkg_download()
 	#get xgb file
 	gpkg_getxgbfile $1
 
-	if [ $? == 0 ]; then
+	if [ "$?" == "0" ]; then
 		#found, download it
 		gpkg_begin_download $newest
 
