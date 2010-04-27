@@ -33,13 +33,14 @@ gpkg $gpkg_version, usage:\n
 	\t-v            \t\tshow current version\n
 	\t--sync [path] \tsync xglibs via git to [path]/var/xiange\n
 	\t-s package 	\tsearch package\n
+	\t-S file 	\tsearch which package file belongs to\n
 	\t-d package 	\tdownload package\n
 	\t-i package 	\tinstall package\n
 	\t-D package 	\tremove package\n
 	\t-I  		\t\tlist installed package\n
 	\t-l package 	\tlist all files in installed package\n
-	\t-ib xgp file	\tinstall binary package to system
-	\n
+	\t-ib xgp file	\tinstall binary package to system\n
+	\t-F path	\tfind orphans in path. e.g. not belongs to any package\n
 XianGe base is at $XGPATH\n
 "
 
@@ -692,6 +693,7 @@ gpkg_mkpackage()
 	#generate file list
 	cd $XGPATH_DEST
 	find | xgfileinfo > /tmp/file-$N-$V$R
+	err_check "call xgfileinfo failed."
 
 	mkdir -p $destpath
 	err_check "[Error] create db directory failed."
@@ -1234,6 +1236,89 @@ gpkg_install_binary_package()
 	echo "[OK] Binary package $N-$V$R installed to you system."
 }
 
+gpkg_search_belonging()
+{
+	local packags
+	local i
+	local name
+	local csv
+	local outcnt=0
+	local count=0
+	local -a value
+
+
+	packags=$(grep ",$1," `find $XGPATH_DB -iname "*.file"`)
+	for i in $packags
+	do
+		((outcnt++))
+
+		name=${i%%:*}
+		name=${name%.file}
+		atom_parse_path $name
+
+		csv=${i#*:}
+		csv_split $csv	
+
+		echo "$T/$N-$V$R : ${value[0]},${value[1]}"
+	done
+
+	if [ "$outcnt" == "0" ]; then
+		echo ""
+		echo "Not found. Please try with full path or regular expression, such as"
+		echo -e "\tgpkg -S .*libgcc.*"
+		echo -e "\tgpkg -S /usr/bin/gcc"
+		echo ""
+		return 1
+	fi
+
+	if [ "$outcnt" == "1" ]; then
+		return 0
+	fi
+
+	return 2
+}
+
+gpkg_check_orphan()
+{
+	local line
+	local tcount=0
+	local orphan=0
+	local conflict=0
+	local outcnt=0
+	local ret
+
+	while IFS= read -r line
+	do
+		[ -z "$line" ] && continue
+		((tcount++))
+		gpkg_search_belonging $line > /dev/null
+		ret=$?
+
+		if [ "$ret" == "1" ]; then
+			#orphan
+			((orphan++))
+			((outcnt++))
+			printf "%6d %c %s\n" $outcnt "O" "$line"
+		fi
+
+		if [ "$ret" == "2" ]; then
+			#orphan
+			((conflict++))
+			((outcnt++))
+			printf "%6d %c %s\n" $outcnt "M" "$line"
+		fi
+	done
+
+	echo "Searched $tcount files, $orphan orphans, $conflict conflicts"
+
+}
+
+gpkg_find_orphans()
+{
+	echo "Searching orphans in $1.."
+	find "$1" -type f | gpkg_check_orphan
+}
+
 #
 # parse parameters
 #
@@ -1246,6 +1331,11 @@ case "${1}" in
 -s)
 	#search package.
 	gpkg_search $2
+	;;
+
+-S)
+	#search file belongs to which package.
+	gpkg_search_belonging $2
 	;;
 
 -d)
@@ -1273,6 +1363,10 @@ case "${1}" in
 	;;
 -ib)
 	gpkg_install_binary_package "$2"
+	;;
+
+-F)
+	gpkg_find_orphans $2
 	;;
 
 --sync)
