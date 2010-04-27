@@ -28,7 +28,7 @@ XG_I18N="en zh_CN"
 #
 # version and  usage 
 #
-gpkg_version=0.10.3
+gpkg_version=0.10.4
 gpkg_usage="
 gpkg $gpkg_version, usage:\n
 	\t-v            \t\tshow current version\n
