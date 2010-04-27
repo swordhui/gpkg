@@ -6,8 +6,9 @@ to Make
 	default CC is "gcc"
 
 to Install
-	make prefix=xxx BASH_PATH=xxx install
-	gpkg and xgfileinfo will be installed to ${prefix}/bin
+	make DESTDIR=xxx prefix=xxx BASH_PATH=xxx install
+	gpkg and xgfileinfo will be installed to ${DESTDIR}${prefix}/bin
+	default ${DESTDIR} is ""
 	default ${prefix} is ""
 	default ${BASH_PATH} is "${prefix}/bin"
 
@@ -30,7 +31,27 @@ to Install
 
 
 History:
+
 	0.10.1  2010-04-16,17:53
 
-	1. call xgb_prerm before remove all files/directorys
-	2. add git config when sync xglibs at the first time
+		1. call xgb_prerm before remove all files/directorys
+		2. add git config when sync xglibs at the first time
+
+	0.10.2
+		1. build binary package file xgp, and -ib command to install it.
+		2. stip useless i18n translations, zip man/info docs
+		3. add xgb_check, and store xgb_check results
+		4. add CFLAGS/CPPFLAGS for package compiling
+
+	0.10.3
+		1. add make test
+		2. new search/download/install method, support version input
+		3. add auto-build script for stage1
+		4. add -S and -F command
+
+	0.10.4 
+		1. add CC macro 
+		2. add DESTDIR for installation
+		4. update README
+		
+

@@ -2,6 +2,7 @@ prefix=
 BASH_PATH=${prefix}/bin
 CC=gcc
 CFLAGS=-O2
+DESTDIR=
 
 all: xgfileinfo
 	@echo "Done"
@@ -10,14 +11,14 @@ all: xgfileinfo
 xgfileinfo: FORCE
 	make -C xgfileinfo
 
-install: FORCE
-	@echo "Install to ${prefix}, bash is at ${BASH_PATH}"
-	@mkdir -p ${prefix}/bin
-	@cp gpkg ${prefix}/bin
-	@cp xgfileinfo/xgfileinfo ${prefix}/bin
-	@sed -i "s@^\#\!/bin@\#\!${BASH_PATH}@" ${prefix}/bin/gpkg
-	@chmod a+x ${prefix}/bin/gpkg 
-	@chmod a+x ${prefix}/bin/xgfileinfo 
+install: xgfileinfo
+	@echo "Install to ${DESTDIR}, bash is at ${BASH_PATH}"
+	@mkdir -p ${DESTDIR}${prefix}/bin
+	@cp gpkg ${DESTDIR}${prefix}/bin
+	@cp xgfileinfo/xgfileinfo ${DESTDIR}${prefix}/bin
+	@sed -i "s@^\#\!/bin@\#\!${BASH_PATH}@" ${DESTDIR}${prefix}/bin/gpkg
+	@chmod a+x ${DESTDIR}${prefix}/bin/gpkg 
+	@chmod a+x ${DESTDIR}${prefix}/bin/xgfileinfo 
 	@echo "Done"
 
 test: FORCE
@@ -26,7 +27,7 @@ test: FORCE
 
 testinst: FORCE
 	@mkdir ./test
-	make prefix=./test BASH_PATH=/bin install
+	make DESTDIR=./test prefix=/usr  install
 	@echo "Done"
 
 clean: FORCE

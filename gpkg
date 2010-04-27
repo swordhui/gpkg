@@ -19,6 +19,7 @@ XGPATH_UNPACK=/tmp/xiange/sources
 XGPATH_DEST=/tmp/xiange/pack
 
 #compile parameters
+CC=gcc
 CFLAGS="-march=native -mtune=native -O2 -fomit-frame-pointer -pipe"
 CPPFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
@@ -526,6 +527,7 @@ gpkg_begin_download()
 	err_check "[Error] $XGPATH_LIB/template.xgb not found."
 
 	#prepare XGB_CONFIG, CFLAGS, CPPFLAGS, XGINST_PREFIX
+	export CC=$CC
 	export CFLAGS=$CFLAGS
 	export CPPFLAGS=$CPPFLAGS
 	XGB_CONFIG="$XGINST_PREFIX "
@@ -774,6 +776,7 @@ gpkg_begininstall()
 	err_check "[Error] call xgb_unpack failed"
 
 	#call config and store config result
+	rm -f /tmp/xiange/$N-$V$R.pipe
 	mkfifo /tmp/xiange/$N-$V$R.pipe
 	tee /tmp/xiange/$N-$V$R.config < /tmp/xiange/$N-$V$R.pipe & 
 	xgb_config >  /tmp/xiange/$N-$V$R.pipe
@@ -790,6 +793,7 @@ gpkg_begininstall()
 
 	#check if possiable, and ignore result
 	#store information to /tmp/xiange/$N-$V$R.test
+	rm -f /tmp/xiange/$N-$V$R.pipe2
 	mkfifo /tmp/xiange/$N-$V$R.pipe2
 	tee /tmp/xiange/$N-$V$R.test < /tmp/xiange/$N-$V$R.pipe2 & 
 	xgb_check > /tmp/xiange/$N-$V$R.pipe2
