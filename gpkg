@@ -28,7 +28,7 @@ XG_I18N="en zh_CN"
 #
 # version and  usage 
 #
-gpkg_version=0.10.4
+gpkg_version=0.10.5
 gpkg_usage="
 gpkg $gpkg_version, usage:\n
 	\t-v            \t\tshow current version\n
@@ -272,6 +272,9 @@ gpkg_getallxgbver()
 		else
 			allver+=" | $V$R"
 		fi
+
+		#include file for HOMEPAGE and DESCRIPTION
+		. $file
 	done
 }
 
@@ -323,6 +326,9 @@ gpkg_searchOK()
 
 	#search installed
 	gpkg_searchInstalled $1 $2
+
+	echo -e "\tDesc.    : $DESCRIPTION"
+	echo -e "\tHomepage : $HOMEPAGE"
 
 	#add blank line
 	echo ""
@@ -476,6 +482,7 @@ gpkg_getxgbfile()
 	if [ "$count"0 -gt 10 ]; then
 		#more results
 		echo "Too more results"
+		echo $results
 		return 1
 	fi
 
@@ -503,6 +510,7 @@ gpkg_getxgbfile()
 	if [ "$count"0 -gt 10 ]; then
 		#more results
 		echo "Too more results"
+		echo $results
 		return 1
 	fi
 
@@ -762,9 +770,19 @@ gpkg_rm_packgeinfo()
 	gpkg_rm_dir_safe $XGPATH_DB
 }
 
+#Check if already insalled. $T/$N$V 
+gpkg_checkInst()
+{
+	[ -f $XGPATH_DB/$T/$N/$N-$V$R.file ] && return 0
+	return 1
+}
+
 gpkg_begininstall()
 {
 	local ret=0
+
+	#check if installed.
+	gpkg_checkInst && echo "$N-$V$R already installed." && return 0
 
 	# DO RM WITH CAUTION!! 
 	rm -rf /tmp/xiange/sources
@@ -1358,7 +1376,7 @@ case "${1}" in
 
 -I)
 	#list installed packages, sort by installed time
-	gpkg_list_installed
+	gpkg_list_installed $2
 	;;
 
 -l)
