@@ -408,7 +408,7 @@ check_and_download_raw()
 				rm -f ${XGPATH_SOURCE}/${fname}.tmp 
 
 			wget $1 -O ${XGPATH_SOURCE}/${fname}.tmp
-			if [ "$?" == 0 ]; then
+			if [ "$?" == "0" ]; then
 				#download ok.
 				mv ${XGPATH_SOURCE}/${fname}.tmp ${XGPATH_SOURCE}/${fname}
 				return 0
