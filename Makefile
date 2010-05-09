@@ -30,6 +30,11 @@ testinst: FORCE
 	make DESTDIR=./test prefix=/usr  install
 	@echo "Done"
 
+direct: all
+	install -m 0755 gpkg /bin
+	install -m 0755  xgfileinfo/xgfileinfo /bin
+
+
 clean: FORCE
 	make -C xgfileinfo clean
 	rm -rf ./test
