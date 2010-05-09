@@ -28,7 +28,7 @@ XG_I18N="en zh_CN"
 #
 # version and  usage 
 #
-gpkg_version=0.10.5
+gpkg_version=0.10.6
 gpkg_usage="
 gpkg $gpkg_version, usage:\n
 	\t-v            \t\tshow current version\n
@@ -42,6 +42,8 @@ gpkg $gpkg_version, usage:\n
 	\t-l package 	\tlist all files in installed package\n
 	\t-ib xgp file	\tinstall binary package to system\n
 	\t-F path	\tfind orphans in path. e.g. not belongs to any package\n
+	\t-chroot path	\tchroot to new system\n
+	\t-unchroot path\tun-chroot\n
 XianGe base is at $XGPATH\n
 "
 
@@ -781,8 +783,6 @@ gpkg_begininstall()
 {
 	local ret=0
 
-	#check if installed.
-	gpkg_checkInst && echo "$N-$V$R already installed." && return 0
 
 	# DO RM WITH CAUTION!! 
 	rm -rf /tmp/xiange/sources
@@ -864,8 +864,11 @@ gpkg_install()
 
 	#get xgb file
 	gpkg_getxgbfile $1
-
 	if [ $? == 0 ]; then
+
+		#check if installed.
+		atom_parse_path $newest
+		gpkg_checkInst && echo "$N-$V$R already installed." && return 0
 		#found, download it
 		gpkg_begin_download $newest
 		ret=$?
@@ -1404,6 +1407,9 @@ case "${1}" in
 		git pull
 	else
 		cd ..
+		#remove an system error.
+		[ -d /etc ] || mkdir /etc
+		[ -f /etc/hosts ] || touch /etc/hosts
 		git config --system --add user.name xguser
 		git config --system --add user.email xguser@xiangelinux.com
 		git clone git://github.com/swordhui/xglibs.git
@@ -1423,6 +1429,99 @@ stage1)
 	gpkg_do_stage1 $lines  < $XGPATH_LIB/stages/stage1
 	;;
 
+-chroot)
+	#chroot to new system.
+
+	#check parameter
+	if [ -z "$2" ]; then
+		echo "Please specify destination, such as:"
+		echo -e "\t gpkg chroot /mnt/xg"
+		exit 1
+	fi
+
+	#check tools directory
+	if [ -d "$2/tools" ]; then
+		echo "$2 check OK"
+	else 
+		echo "$2/tools not found" 
+		exit 2
+	fi
+
+	#first, prepare tmp fs.
+	mountpoint -q /dev/shm
+	err_check "Error: /dev/shm not mount to tmpfs."
+
+	#mount tmp fs.
+	mkdir -p /dev/shm/xgtmp
+	chmod 1777 /dev/shm/xgtmp
+	mkdir -p $2/tmp
+	chmod 1777 $2/tmp
+	umount $2/tmp 2>/dev/null
+        mount --bind /dev/shm/xgtmp $2/tmp
+	err_check "Error: mount $2/tmp failed."
+
+	#prepare 2 devie: null and console
+	[ -d $2/dev ] || mkdir $2/dev
+        [ -c $2/dev/null ] || mknod -m 666 $2/dev/null c 1 3
+        [ -c $2/dev/console ] || mknod -m 600 $2/dev/console c 5 1
+
+	#mount proc/sysfs/devfs
+	mkdir -p $2/proc
+        mkdir -p $2/sys
+        mkdir -p $2/dev
+
+	umount $2/proc 2>/dev/null
+        umount $2/sys 2>/dev/null
+        umount $2/dev 2>/dev/null
+
+	mount -t proc none $2/proc
+	err_check "Error: mount $2/proc failed."
+        mount -t sysfs none $2/sys
+	err_check "Error: mount $2/sys failed."
+        mount --bind /dev $2/dev
+	err_check "Error: mount $2/dev failed."
+
+	#prepare resolv.conf
+	[ -d $2/etc ] || mkdir $2/etc
+        [ -f $2/etc/resolv.conf ] || cp /etc/resolv.conf $2/etc
+
+
+	#chroot
+	if [ -f $2/bin/bash ]; then
+		bashfile="/bin/bash"
+	else
+		bashfile="/tools/bin/bash"
+	fi
+
+	chroot $2 /tools/bin/env -i \
+		HOME=/root TERM="$TERM" PS1='\u:\w\$ ' \
+		PATH=/bin:/usr/bin:/sbin:/usr/sbin:/tools/bin \
+		XGSIGN=xg_chroot\
+		$bashfile  +h
+	err_check "Error: chroot to $2 failed."
+	;;
+
+-unchroot)
+	#check parameter
+	if [ -z "$2" ]; then
+		echo "Please specify destination, such as:"
+		echo -e "\t gpkg unchroot /mnt/xg"
+		exit 1
+	fi
+
+	echo "unmounting $2.."
+	umount  $2/tmp
+	err_check "Error: unmount $2/tmp failed."
+	rm -rf /dev/shm/xgtmp
+	
+	umount  $2/proc
+	err_check "Error: unmount $2/proc failed."
+	umount  $2/sys
+	err_check "Error: unmount $2/sys failed."
+	umount  $2/dev
+	err_check "Error: unmount $2/dev failed."
+	echo "unmount $2 OK"
+	;;
 *)
 	#show usage 
 	gpkg_show_usage
