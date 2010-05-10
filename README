@@ -53,5 +53,17 @@ History:
 		1. add CC macro 
 		2. add DESTDIR for installation
 		4. update README
+
+	0.10.5
+		1. quit if package has already installed.
+
+	0.10.6
+		1. add command -chroot, -unchroot 
+		2. create /etc/hosts to fix git system error.
+
+	0.10.7
+		1. gdd -info command to show parameters
+		2. load /etc/xgparas if available for new parameters
+		
 		
 
