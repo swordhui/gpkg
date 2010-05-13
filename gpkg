@@ -28,7 +28,7 @@ XG_I18N="en zh_CN"
 #
 # version and  usage 
 #
-gpkg_version=0.10.7
+gpkg_version=0.10.8
 gpkg_usage="
 gpkg $gpkg_version, usage:\n
 	\t-v            \t\tshow current version\n
@@ -1416,6 +1416,7 @@ case "${1}" in
 	if [ -d .git ]; then
 		#alread exist.
 		git pull
+		err_check "[Error] pull from server failed."
 	else
 		cd ..
 		#remove an system error.
@@ -1434,10 +1435,10 @@ selftest)
 	gpkg_test_bgin
 	;;
 
-stage1)
+stage[0-4])
 	#read from list, and install it one by one.
-	lines=$(wc -l $XGPATH_LIB/stages/stage1)
-	gpkg_do_stage1 $lines  < $XGPATH_LIB/stages/stage1
+	lines=$(wc -l $XGPATH_LIB/stages/$1)
+	gpkg_do_stage1 $lines  < $XGPATH_LIB/stages/$1
 	;;
 
 -chroot)
