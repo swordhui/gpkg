@@ -20,15 +20,16 @@ XGPATH_DEST=/tmp/xiange/pack
 
 #compile parameters
 CC=gcc
+CXX=g++
 CFLAGS="-march=native -mtune=native -O2 -fomit-frame-pointer -pipe"
-CPPFLAGS="$CFLAGS"
+CXXFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
 XG_I18N="en zh_CN"
 
 #
 # version and  usage 
 #
-gpkg_version=0.10.8
+gpkg_version=0.10.9
 gpkg_usage="
 gpkg $gpkg_version, usage:\n
 	\t-v            \t\tshow current version\n
@@ -539,8 +540,9 @@ gpkg_begin_download()
 
 	#prepare XGB_CONFIG, CFLAGS, CPPFLAGS, XGINST_PREFIX
 	export CC=$CC
+	export CXX=$CXX
 	export CFLAGS=$CFLAGS
-	export CPPFLAGS=$CPPFLAGS
+	export CXXFLAGS=$CXXFLAGS
 	XGB_CONFIG="$XGINST_PREFIX "
 	XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
 
@@ -735,7 +737,7 @@ gpkg_mkpackage()
 
 	#tar it.
 	mkdir -p $XGPATH_PACKAGE
-	echo "make packages.."
+	echo ">>> make packages... please wait a minute"
 	tar cjpf $XGPATH_PACKAGE/$N-$V$R.xgp *
 
 }
@@ -887,6 +889,49 @@ gpkg_install()
 }
 
 
+gpkg_begin_showdep()
+{
+	#unset DEP,RDEP
+	#include file.
+
+	#check if package installed.
+
+	#if now, show it, and all packages its depenant
+	return 0
+
+}
+
+gpkg_showdep()
+{
+	local newest
+	local ret
+	local itype
+	local iname
+	local iver
+	local irver
+
+	#parse input 
+	atom_parse_type $1
+	itype=$T
+	iname=$N
+	iver=$V
+	irver=$R
+
+	#get xgb file
+	gpkg_getxgbfile $1
+	if [ $? == 0 ]; then
+
+		#check if installed.
+		atom_parse_path $newest
+		gpkg_checkInst && echo "$N-$V$R already installed." && return 0
+
+		#found, include and print deps
+		
+	else
+		#not found
+		return 1
+	fi
+}
 
 
 #
@@ -1345,6 +1390,101 @@ gpkg_find_orphans()
 	find "$1" -type f | gpkg_check_orphan
 }
 
+#$1 is file
+gpkg_check_rdep()
+{
+	local i
+	local name
+	local value
+
+	packags=$(grep ",$1," `find $XGPATH_DB -iname "*.file"`)
+	for i in $packags
+	do
+
+		name=${i%%:*}
+		name=${name%.file}
+		atom_parse_path $name
+		value="$T/$N-$V$R"
+
+		str_isIn "$sret" "$value"
+		if [ "$?" == "0" ]; then
+			#not found
+			((rcount++))
+			sret+="$value "
+		fi
+	done
+}
+
+
+gpkg_show_rdep()
+{
+	local bins
+	local dlls
+	local i
+	local dp
+	local sret=""
+	local count=0
+	local rcount=0
+	local pcnt=0
+
+	echo "Searching rdep for $1.."	
+
+	bins=$(find /bin /usr/bin /sbin /usr/sbin  -type f 2>/dev/null)
+	dlls=$(find /lib /usr/lib -type f -iname "*.so*" 2>/dev/null)
+	printf "%-8dFound:%-4d" 0 0
+	for i in $bins $dlls
+	do
+		((count++))
+		((pcnt++))
+		dp=$(ldd $i 2>/dev/null)
+		str_isIn "$dp" "$1"
+		if [ "$?" == "1" ]; then
+			#fond.
+			gpkg_check_rdep "$i"
+		fi
+
+		if [ $pcnt -gt 50 ]; then
+			printf "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+			printf "%-8dFound:%-4d" $count $rcount
+			pcnt=0
+		fi
+
+	done
+
+	echo ""
+	echo "Result:"
+	count=0
+
+	for i in $sret
+	do
+		((count++))
+		printf "%-4d %s\n" $count $i
+	done
+}
+
+#$1 is package name.
+gpkg_rdep()
+{
+	local sofile
+	local i
+
+	sofile=$(gpkg -l $1 | grep "\.so$")
+	if [ -z "$sofile" ]; then
+		echo "Error: package $1 has no so file"
+		exit 1
+	fi
+
+	for i in $sofile
+	do
+		str_isIn "$i" "so"
+		if [ "$?" == "0" ]; then
+			continue
+		fi
+		gpkg_show_rdep $(basename $i)
+	done
+
+}
+
 #
 # parse parameters
 #
@@ -1359,8 +1499,9 @@ case "${1}" in
 	;;
 -info)
 	echo "CC=\"$CC\""
+	echo "CXX=\"$CXX\""
 	echo "CFLAGS=\"$CFLAGS\""
-	echo 'CPPFLAGS="$CFLAGS"'
+	echo 'CXXFLAGS="$CFLAGS"'
 	echo "XG_I18N=\"$XG_I18N\""
 	;;
 
@@ -1533,6 +1674,13 @@ stage[0-4])
 	umount  $2/dev
 	err_check "Error: unmount $2/dev failed."
 	echo "unmount $2 OK"
+	;;
+-p)
+	#show dependant
+	;;
+-rdep)
+	#show reverse dep for specified library
+	gpkg_rdep "$2"
 	;;
 *)
 	#show usage 
