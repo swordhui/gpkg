@@ -29,7 +29,7 @@ XG_I18N="en zh_CN"
 #
 # version and  usage 
 #
-gpkg_version=0.10.9
+gpkg_version=0.10.10
 gpkg_usage="
 gpkg $gpkg_version, usage:\n
 	\t-v            \t\tshow current version\n
@@ -41,10 +41,11 @@ gpkg $gpkg_version, usage:\n
 	\t-D package 	\tremove package\n
 	\t-I  		\t\tlist installed package\n
 	\t-l package 	\tlist all files in installed package\n
-	\t-ib xgp file	\tinstall binary package to system\n
+	\t-ib xgp_file	\tinstall binary package to system\n
 	\t-F path	\tfind orphans in path. e.g. not belongs to any package\n
-	\t-chroot path	\tchroot to new system\n
+	\t-chroot path	\tchroot to new system, for system installing\n
 	\t-unchroot path\tun-chroot\n
+	\t-rdep package\tshow reverse dependence\n
 	\t-info		\t\tshow gpkg parameters. to modify parameters, gpkg info > /etc/xgparas, then edit /etc/xgparas\n
 XianGe base is at $XGPATH\n
 "
@@ -66,6 +67,22 @@ str_isIn()
 	else
 		return 0
 	fi
+}
+
+#check: if $2 in $1 exactly. return 1 if in, return 0 if not in.
+str_isInExactly()
+{
+	local str
+
+	for str in $1
+	do
+		if [ "$str" == "$2" ]; then
+			#in string.
+			return 1
+		fi
+	done
+
+	return 0
 }
 
 #
@@ -889,18 +906,10 @@ gpkg_install()
 }
 
 
-gpkg_begin_showdep()
-{
-	#unset DEP,RDEP
-	#include file.
 
-	#check if package installed.
 
-	#if now, show it, and all packages its depenant
-	return 0
-
-}
-
+# $1 is package name, such as "glibc"
+# $2 is leading charaters before package name
 gpkg_showdep()
 {
 	local newest
@@ -909,6 +918,8 @@ gpkg_showdep()
 	local iname
 	local iver
 	local irver
+	local dep
+	local leading
 
 	#parse input 
 	atom_parse_type $1
@@ -925,7 +936,37 @@ gpkg_showdep()
 		atom_parse_path $newest
 		gpkg_checkInst && echo "$N-$V$R already installed." && return 0
 
+		#check if in global set.
+
+		#not in global set, add it.
+
 		#found, include and print deps
+		#echo ">>> begin show $newest.."
+
+		#include file.
+		. $XGPATH_LIB/template.xgb
+		err_check "include xgb template file failed."
+
+		#call init
+		. $XGPATH_SCRIPT/$T/$N/$N-$V$R.xgb
+		err_check "include xgb file failed."
+
+		xgb_init > /dev/null 2>&1
+		err_check "call xgb_init failed"
+
+		#show package
+		echo "${2} ${1}"
+
+		#check if package installed.
+		#show all deps
+		#echo ">>> DEP = $DEPEND"
+
+		leading="${2}    "
+		for dep in $DEPEND
+		do
+			gpkg_showdep "$dep" "$leading"	
+			err_check "Error: DEP $dep Not found."
+		done
 		
 	else
 		#not found
@@ -1600,18 +1641,27 @@ stage[0-4])
 		exit 2
 	fi
 
-	#first, prepare tmp fs.
-	mountpoint -q /dev/shm
-	err_check "Error: /dev/shm not mount to tmpfs."
+	#first, check tmpfs
 
-	#mount tmp fs.
-	mkdir -p /dev/shm/xgtmp
-	chmod 1777 /dev/shm/xgtmp
 	mkdir -p $2/tmp
 	chmod 1777 $2/tmp
 	umount $2/tmp 2>/dev/null
-        mount --bind /dev/shm/xgtmp $2/tmp
-	err_check "Error: mount $2/tmp failed."
+
+	tmpsize=$(df | gawk '$1 == "tmpfs" && $6 == "/dev/shm" {print $4}')
+	if [ -n "$tmpsize" ]; then
+		if [ "$tmpsize" -ge "3000000" ]; then
+			echo ">>> tmpfs size check OK, enabled."
+			#mount tmp fs.
+			mkdir -p /dev/shm/xgtmp
+			chmod 1777 /dev/shm/xgtmp
+        		mount --bind /dev/shm/xgtmp $2/tmp
+			err_check "Error: mount $2/tmp failed."
+		else
+			echo ">>> tmpfs is too small, disabled"
+		fi
+	else
+		echo ">>> no tmpfs on /dev/shm found, disable it"
+	fi
 
 	#prepare 2 devie: null and console
 	[ -d $2/dev ] || mkdir $2/dev
@@ -1663,9 +1713,8 @@ stage[0-4])
 	fi
 
 	echo "unmounting $2.."
-	umount  $2/tmp
-	err_check "Error: unmount $2/tmp failed."
-	rm -rf /dev/shm/xgtmp
+	umount  $2/tmp 2>/dev/null
+	rm -rf /dev/shm/xgtmp 2>/dev/null
 	
 	umount  $2/proc
 	err_check "Error: unmount $2/proc failed."
@@ -1676,8 +1725,13 @@ stage[0-4])
 	echo "unmount $2 OK"
 	;;
 -p)
+	#unset DEP,RDEP
+	unset GPKG_DEP_LIST
+
 	#show dependant
+	gpkg_showdep $2 ""
 	;;
+
 -rdep)
 	#show reverse dep for specified library
 	gpkg_rdep "$2"
