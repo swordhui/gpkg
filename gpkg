@@ -1032,15 +1032,15 @@ gpkg_csvop_ls()
 	case "${value[0]}" in
 	D)
 		#directory
-		printf "%s| %8s| $INFO%s\n" "d" "${value[2]}" "${value[1]}"
+		printf "$NORMAL%s| %8s| $INFO%s\n" "d" "${value[2]}" "${value[1]}"
 		;;
 	S)
 		#Link
-		printf "%s| %8s| $BRACKET%s\n" "l" "${value[2]}" "${value[1]}"
+		printf "$NORMAL%s| %8s| $BRACKET%s\n" "l" "${value[2]}" "${value[1]}"
 		;;
 	F)
 		#File
-		printf "%s| %8s| $FAILURE%s\n" " " "${value[2]}" "${value[1]}"
+		printf "$NORMAL%s| %8s| $FAILURE%s\n" " " "${value[2]}" "${value[1]}"
 		;;
 
 	*)
