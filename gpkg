@@ -26,33 +26,75 @@ CXXFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
 XG_I18N="en zh_CN"
 
+#GIT server
+XG_GITSVR="git://github.com/swordhui/xglibs.git"
+
+#color defines
+## Set color commands, used via $ECHO
+# Please consult `man console_codes for more information
+# under the "ECMA-48 Set Graphics Rendition" section
+#
+# Warning: when switching from a 8bit to a 9bit font,
+# the linux console will reinterpret the bold (1;) to
+# the top 256 glyphs of the 9bit font. This does
+# not affect framebuffer consoles
+NORMAL="\\033[0;39m" # Standard console grey
+SUCCESS="\\033[1;32m" # Success is green
+WARNING="\\033[1;33m" # Warnings are yellow
+FAILURE="\\033[1;31m" # Failures are red
+INFO="\\033[1;36m" # Information is light cyan
+BRACKET="\\033[1;34m" # Brackets are blue
+
+
 #
 # version and  usage 
 #
-gpkg_version=0.10.10
+gpkg_version=0.10.11
 gpkg_usage="
-gpkg $gpkg_version, usage:\n
-	\t-v            \t\tshow current version\n
-	\t--sync [path] \tsync xglibs via git to [path]/var/xiange\n
-	\t-s package 	\tsearch package\n
-	\t-S file 	\tsearch which package file belongs to\n
-	\t-d package 	\tdownload package\n
-	\t-i package 	\tinstall package\n
-	\t-D package 	\tremove package\n
-	\t-I  		\t\tlist installed package\n
-	\t-l package 	\tlist all files in installed package\n
-	\t-ib xgp_file	\tinstall binary package to system\n
-	\t-F path	\tfind orphans in path. e.g. not belongs to any package\n
-	\t-chroot path	\tchroot to new system, for system installing\n
-	\t-unchroot path\tun-chroot\n
-	\t-rdep package\tshow reverse dependence\n
-	\t-info		\t\tshow gpkg parameters. to modify parameters, gpkg info > /etc/xgparas, then edit /etc/xgparas\n
+gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
+	$INFO\t-v            	$NORMAL\t\tshow current version\n
+	$INFO\t--sync [path] 	$NORMAL\tsync xglibs via git to [path]/var/xiange\n
+	$INFO\t-s package	$NORMAL\tsearch package\n
+	$INFO\t-S file 		$NORMAL\tsearch which package file belongs to\n
+	$INFO\t-d package 	$NORMAL\tdownload package\n
+	$INFO\t-i package 	$NORMAL\tinstall package\n
+	$INFO\t-D package 	$NORMAL\tremove package\n
+	$INFO\t-I  		$NORMAL\t\tlist installed package\n
+	$INFO\t-l package 	$NORMAL\tlist all files in installed package\n
+	$INFO\t-ib xgp_file	$NORMAL\tinstall binary package to system\n
+	$INFO\t-F path		$NORMAL\tfind orphans in path. e.g. not belongs to any package\n
+	$INFO\t-chroot path	$NORMAL\tchroot to new system, for system installing\n
+	$INFO\t-unchroot path	$NORMAL\tun-chroot\n
+	$INFO\t-rdep package	$NORMAL\tshow reverse dependence\n
+	$INFO\t-info		$NORMAL\t\tshow gpkg parameters. to modify parameters, gpkg info > /etc/xgparas, then edit /etc/xgparas\n
 XianGe base is at $XGPATH\n
 "
 
 gpkg_show_usage()
 {
 	echo -e $gpkg_usage
+}
+
+#
+# colourful echo 
+#
+
+#show info in cyan color, $1 is information.
+showinfo()
+{
+	echo -e  $INFO"$1"$NORMAL
+}
+
+#show OK message in green color, $1 is information.
+showOK()
+{
+	echo -e $SUCCESS"$1"$NORMAL
+}
+
+#show OK message in green color, $1 is information.
+showFailed()
+{
+	echo -e $FAILURE"$1"$NORMAL
 }
 
 #
@@ -93,7 +135,7 @@ str_isInExactly()
 err_check()
 {
 	if [ $? != 0 ]; then
-		echo $1
+		echo -e $FAILURE"$1"
 		exit 1
 	fi
 }
@@ -325,11 +367,11 @@ gpkg_searchInstalled()
 		csv_split `tail -n 1 $searchpath/$N-$V$R.file`
 		tsize=${value[5]}
 
-		printf "\tInstalled: %s | %s %s %sK\n" $V$R $t1 $t2 $tsize 
+		printf "$NORMAL\tInstalled:$SUCCESS %s | %s %s $BRACKET%sK\n" $V$R $t1 $t2 $tsize 
 		findcnt=$(($findcnt+1))
 	done
 
-	[ "$findcnt" == "0" ] && echo -e "\tInstalled:\t None"
+	[ "$findcnt" == "0" ] && echo -e "$NORMAL\tInstalled:$FAILURE None"
 }
 
 
@@ -339,17 +381,17 @@ gpkg_searchOK()
 	local allver
 
 	#show it.
-	echo "* $1/$2"
+	echo -e $FAILURE"* $1/$2"
 
 	#get newest version
 	gpkg_getallxgbver $XGPATH_LIB/$1/$2
-	echo -e "\tAvailable: $allver"
+	echo -e "$NORMAL\tAvailable:$INFO $allver"
 
 	#search installed
 	gpkg_searchInstalled $1 $2
 
-	echo -e "\tDesc.    : $DESCRIPTION"
-	echo -e "\tHomepage : $HOMEPAGE"
+	echo -e "$NORMAL\tDesc.    :$INFO $DESCRIPTION"
+	echo -e "$NORMAL\tHomepage :$INFO $HOMEPAGE"
 
 	#add blank line
 	echo ""
@@ -549,7 +591,7 @@ gpkg_begin_download()
 
 	#find newest version.
 	atom_parse_path $1
-	echo "Begin download $N-$V$R..."
+	showinfo ">> Begin download $N-$V$R..."
 
 	#clear all routines by include template file
 	. $XGPATH_LIB/template.xgb
@@ -583,7 +625,7 @@ gpkg_begin_download()
 	done
 
 	#check
-	echo "Download OK"
+	showOK ">> Download OK"
 	return 0
 }
 
@@ -633,7 +675,7 @@ gpkg_strip_i18n()
 		str_isIn "$XG_I18N" $name 
 		if [ "$?" == "0" ]; then
 			#not in XG_I18N, remove.
-			echo ">>> strip i18n $name.."
+			showinfo ">> strip i18n $name.."
 			rm -rf $ipath/$name
 		fi
 	done
@@ -659,7 +701,7 @@ gpkg_strip_mani18n()
 		str_isIn "$XG_I18N" $name 
 		if [ "$?" == "0" ]; then
 			#not in XG_I18N, remove.
-			echo ">>> strip man-i18n $name.."
+			showinfo ">> strip man-i18n $name.."
 			rm -rf $ipath/$name
 		fi
 	done
@@ -668,7 +710,7 @@ gpkg_strip_mani18n()
 #strip binary in directory $1
 gpkg_stip_bin()
 {
-	echo ">>> strip debug info.."
+	showinfo ">> strip debug info.."
 	find $1/{,usr/}{bin,sbin} -type f \
   		-exec strip --strip-all '{}' ';' 2>/dev/null
 
@@ -679,7 +721,7 @@ gpkg_stip_bin()
 #compress man docs
 gpkg_gzip_man()
 {
-	echo ">>> compress man docs.."
+	showinfo ">> compress man docs.."
 	find $1/usr/{,share/}man -type f \
   		-exec gzip '{}' ';' 2>/dev/null
 }
@@ -695,7 +737,7 @@ gpkg_gzip_info()
 	#quit if not found
 	[ -z "$ipath" ] && return 0
 
-	echo ">>> compress $ipath"
+	showinfo ">> compress $ipath"
 
 	#first, rename dir.
 	[ -f ${ipath}/dir ] && mv ${ipath}/{dir,dir-$N.info}
@@ -754,7 +796,7 @@ gpkg_mkpackage()
 
 	#tar it.
 	mkdir -p $XGPATH_PACKAGE
-	echo ">>> make packages... please wait a minute"
+	showinfo ">> make packages... please wait a minute"
 	tar cjpf $XGPATH_PACKAGE/$N-$V$R.xgp *
 
 }
@@ -807,7 +849,7 @@ gpkg_begininstall()
 	# DO RM WITH CAUTION!! 
 	rm -rf /tmp/xiange/sources
 
-	echo "unpacking $N-$V$R..."
+	showinfo ">> unpacking $N-$V$R..."
 	mkdir -p $XGPATH_UNPACK
 	cd $XGPATH_UNPACK
 	xgb_unpack
@@ -848,10 +890,10 @@ gpkg_begininstall()
 	err_check "[Error] make binary package failed"
 
 	#copy to root
-	echo "Moving files to / ..."
+	showinfo ">> Moving files to / ..."
 	tar xjpf $XGPATH_PACKAGE/$N-$V$R.xgp -C /
 	err_check "[Error] copy binary package to / failed"
-	echo "Install OK, cleaning up.."
+	showinfo ">> Install OK, cleaning up.."
 	
 	#post install
 	xgb_postinst
@@ -859,7 +901,7 @@ gpkg_begininstall()
 
 	#clean up
 	rm -rf /tmp/xiange
-	echo "[***] $N-$V$R installed to your system."
+	showOK "[***] $N-$V$R installed to your system."
 	return 0
 }
 
@@ -888,7 +930,7 @@ gpkg_install()
 
 		#check if installed.
 		atom_parse_path $newest
-		gpkg_checkInst && echo "$N-$V$R already installed." && return 0
+		gpkg_checkInst && showOK ">> $N-$V$R has already been installed." && return 0
 		#found, download it
 		gpkg_begin_download $newest
 		ret=$?
@@ -990,20 +1032,20 @@ gpkg_csvop_ls()
 	case "${value[0]}" in
 	D)
 		#directory
-		printf "%s| %8s| %s\n" "d" "${value[2]}" "${value[1]}"
+		printf "%s| %8s| $INFO%s\n" "d" "${value[2]}" "${value[1]}"
 		;;
 	S)
 		#Link
-		printf "%s| %8s| %s\n" "l" "${value[2]}" "${value[1]}"
+		printf "%s| %8s| $BRACKET%s\n" "l" "${value[2]}" "${value[1]}"
 		;;
 	F)
 		#File
-		printf "%s| %8s| %s\n" " " "${value[2]}" "${value[1]}"
+		printf "%s| %8s| $FAILURE%s\n" " " "${value[2]}" "${value[1]}"
 		;;
 
 	*)
 		#totle
-		printf "\nFile: %s, Dir: %s, Link %d, Size: %dK\n" \
+		printf "$WARNING\nFile: %s, Dir: %s, Link %d, Size: %dK\n" \
 			"${value[1]}"\
 			"${value[2]}" "${value[3]}" "${value[5]}"
 		;;
@@ -1138,7 +1180,7 @@ gpkg_list_inst_info()
 		csv_split `tail -n 1 $XGPATH_DB/$1/$2/$N-$V$R.file`
 		tsize=${value[5]}
 
-		printf "%s %s %6sK %s\n" $t1 $t2 $tsize $N-$V$R
+		printf "$NORMAL%s %s $INFO%6sK $FAILURE%s\n" $t1 $t2 $tsize $N-$V$R
 	done
 	
 }
@@ -1205,7 +1247,7 @@ gpkg_list_package()
 		done
 	done
 
-	[ "$findcount" == "0" ] && echo "package $1 not found"
+	[ "$findcount" == "0" ] && showFailed "package $1 not found"
 }
 
 gpkg_do_remove_package()
@@ -1264,6 +1306,8 @@ gpkg_do_remove_package()
 
 	done
 
+	showOK "[***] $N-$V$R removed."
+
 
 }
 
@@ -1289,7 +1333,7 @@ gpkg_remove_package()
 		done
 	done
 
-	[ "$findcount" == "0" ] && echo "package $1 not found"
+	[ "$findcount" == "0" ] && showFailed "package $1 not found"
 }
 
 gpkg_install_binary_package()
@@ -1300,29 +1344,29 @@ gpkg_install_binary_package()
 
 	dbpath=${XGPATH_DB#/}
 
-	echo "parsing $1..."
+	showinfo ">> parsing $1..."
 	#fine xgbfile in package.
 	xgbfile=$(tar tf "$1" | grep "^$dbpath/.*\.xgb")
 	err_check "get info from xgb file failed."
 
 	#check xgb
-	[ -z "$xgbfile" ] && echo "Not xgp format" && exit 1
+	[ -z "$xgbfile" ] && showFailed "Not xgp format" && exit 1
 
 	xgbfile=${xgbfile#$dbpath}
 	xgbfile=${xgbfile#/}
 	T=${xgbfile%%/*}
-	[ -z "$T" ] && echo "Not xgp format" && exit 1
+	[ -z "$T" ] && showFailed "Not xgp format" && exit 1
 
 	atom=${xgbfile##*/}
 	atom_parse "$atom"
 
-	echo "installing $T/$N-$V$R ..."
+	showinfo ">> installing $T/$N-$V$R ..."
 
 	#copy to root
-	echo "Moving files to / ..."
+	showinfo ">> Moving files to / ..."
 	tar xjpf "$1" -C /
 	err_check "[Error] copy binary package to / failed"
-	echo "Install OK, cleaning up.."
+	showinfo ">> Install OK, cleaning up.."
 
 	#clear all routines by include template file
 	. $XGPATH_LIB/template.xgb
@@ -1345,7 +1389,7 @@ gpkg_install_binary_package()
 	xgb_postinst
 	err_check "[Error] call xgb_postinst failed"
 
-	echo "[OK] Binary package $N-$V$R installed to you system."
+	showOK "[***] Binary package $N-$V$R installed to you system."
 }
 
 gpkg_search_belonging()
@@ -1371,14 +1415,14 @@ gpkg_search_belonging()
 		csv=${i#*:}
 		csv_split $csv	
 
-		echo "$T/$N-$V$R : ${value[0]},${value[1]}"
+		echo -e "$FAILURE$T/$N-$V$R : $INFO${value[0]},${value[1]}"
 	done
 
 	if [ "$outcnt" == "0" ]; then
 		echo ""
-		echo "Not found. Please try with full path or regular expression, such as"
-		echo -e "\tgpkg -S .*libgcc.*"
-		echo -e "\tgpkg -S /usr/bin/gcc"
+		echo -e $FAILURE"Not found. Please try with full path or regular expression, such as"
+		echo -e "$INFO\tgpkg -S .*libgcc.*"
+		echo -e "$INFO\tgpkg -S /usr/bin/gcc"
 		echo ""
 		return 1
 	fi
@@ -1410,18 +1454,18 @@ gpkg_check_orphan()
 			#orphan
 			((orphan++))
 			((outcnt++))
-			printf "%6d %c %s\n" $outcnt "O" "$line"
+			printf "$NORMAL%6d %c $INFO%s\n" $outcnt "O" "$line"
 		fi
 
 		if [ "$ret" == "2" ]; then
 			#orphan
 			((conflict++))
 			((outcnt++))
-			printf "%6d %c %s\n" $outcnt "M" "$line"
+			printf "$NORMAL%6d %c $FAILURE%s\n" $outcnt "M" "$line"
 		fi
 	done
 
-	echo "Searched $tcount files, $orphan orphans, $conflict conflicts"
+	showOK "Searched $tcount files, $orphan orphans, $conflict conflicts"
 
 }
 
@@ -1606,7 +1650,7 @@ case "${1}" in
 		[ -f /etc/hosts ] || touch /etc/hosts
 		git config --system --add user.name xguser
 		git config --system --add user.email xguser@xiangelinux.com
-		git clone git://github.com/swordhui/xglibs.git
+		git clone  $XG_GITSVR
 	fi
 	;;
 
@@ -1634,12 +1678,12 @@ stage[0-4])
 	fi
 
 	#check tools directory
-	if [ -d "$2/tools" ]; then
-		echo "$2 check OK"
-	else 
-		echo "$2/tools not found" 
-		exit 2
-	fi
+#	#if [ -d "$2/tools" ]; then
+#		echo "$2 check OK"
+#	else 
+#		echo "$2/tools not found" 
+#		exit 2
+#	fi
 
 	#first, check tmpfs
 
@@ -1650,17 +1694,17 @@ stage[0-4])
 	tmpsize=$(df | gawk '$1 == "tmpfs" && $6 == "/dev/shm" {print $4}')
 	if [ -n "$tmpsize" ]; then
 		if [ "$tmpsize" -ge "3000000" ]; then
-			echo ">>> tmpfs size check OK, enabled."
+			showOK ">> tmpfs size check OK, enabled."
 			#mount tmp fs.
 			mkdir -p /dev/shm/xgtmp
 			chmod 1777 /dev/shm/xgtmp
         		mount --bind /dev/shm/xgtmp $2/tmp
 			err_check "Error: mount $2/tmp failed."
 		else
-			echo ">>> tmpfs is too small, disabled"
+			echo -e $WARNING">> tmpfs is too small, disabled"$NORMAL
 		fi
 	else
-		echo ">>> no tmpfs on /dev/shm found, disable it"
+		echo -e $WARNING">> no tmpfs on /dev/shm found, disable it"$NORMAL
 	fi
 
 	#prepare 2 devie: null and console
@@ -1696,7 +1740,16 @@ stage[0-4])
 		bashfile="/tools/bin/bash"
 	fi
 
-	chroot $2 /tools/bin/env -i \
+	if [ -f $2/usr/bin/env ]; then
+		envfile="/usr/bin/env"
+		echo "/usr/bin/env"
+	else
+		envfile="/tools/bin/env"
+		echo "/tools/bin/env"
+	fi
+
+
+	chroot $2 $envfile -i \
 		HOME=/root TERM="$TERM" PS1='\u:\w\$ ' \
 		PATH=/bin:/usr/bin:/sbin:/usr/sbin:/tools/bin \
 		XGSIGN=xg_chroot\
@@ -1712,7 +1765,7 @@ stage[0-4])
 		exit 1
 	fi
 
-	echo "unmounting $2.."
+	showinfo ">> unmounting $2.."
 	umount  $2/tmp 2>/dev/null
 	rm -rf /dev/shm/xgtmp 2>/dev/null
 	
@@ -1722,7 +1775,7 @@ stage[0-4])
 	err_check "Error: unmount $2/sys failed."
 	umount  $2/dev
 	err_check "Error: unmount $2/dev failed."
-	echo "unmount $2 OK"
+	showOK "unmount $2 OK"
 	;;
 -p)
 	#unset DEP,RDEP
