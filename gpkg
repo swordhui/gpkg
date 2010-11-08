@@ -1778,6 +1778,8 @@ stage[0-4])
 	showOK "unmount $2 OK"
 	;;
 -p)
+	#show dependece
+
 	#unset DEP,RDEP
 	unset GPKG_DEP_LIST
 
