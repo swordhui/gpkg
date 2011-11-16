@@ -74,6 +74,9 @@ History:
 
 	0.10.10
 		1. check the size of tmpfs before using it.
+
+	0.10.11
+		1. colourful output
 		
 		
 
