@@ -28,6 +28,7 @@ static long 	f_lDiskUsage=0;
 static int	f_iDCount=0;
 static int	f_iFCount=0;
 static int	f_iSCount=0;
+const char *applet_name;
 
 /*
 	Arguments 
@@ -41,10 +42,12 @@ int main(argc,argv)
 int argc;
 char **argv;	
 {
-        char    *pRet=NULL;
-        char    csName[MAX_NAME_LEN];
-        int     count=0;
-        int     len,i,verify_mode;
+		char    *pRet=NULL;
+		char    csName[MAX_NAME_LEN];
+		int     count=0;
+		int     len,i,verify_mode;
+
+	applet_name = argv[0];
 
 	#if 0
 	if(argc>1)
@@ -165,3 +168,10 @@ int get_info(char* csFileName)
 
 	return 0;
 }
+
+void bb_show_usage(void)
+{   
+	//fputs(APPLET_full_usage "\n", stdout);
+	exit(EXIT_FAILURE);
+}
+
