@@ -7,5 +7,8 @@ xgfileinfo_SOURCES = file_info.c md5.c md5.h mddriver.c global.h mv.c \
 	remove_file.c verror_msg.c xfuncs_printf.c llist.c xatonum.c \
 	last_char_is.c xfunc_die.c inode_hash.c concat_subpath_file.c \
 	full_write.c messages.c copyfd.c xreadlink.c time.c default_error_retval.c \
-	safe_write.c read.c bb_strtonum.c
+	safe_write.c read.c bb_strtonum.c libbb.h coreutils.h platform.h \
+	autoconf.h xatonum.h 
+
+EXTRA_xgfileinfo_SOURCES = xatonum_template.c
 
