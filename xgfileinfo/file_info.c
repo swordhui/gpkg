@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <time.h>
+#include "libcsv.h"
 
 extern  int MDFile(const char *pName, char* pMd5Sum, int iBufLen);
 
@@ -83,10 +84,55 @@ static int print_usage(void)
 	printf("\t--help		: this screen.\n");
 	printf("\t-u file		: rolling update according to file.\n");
 	printf("\t-d file		: Remove package according to file.\n");
+	printf("\t-c file		: check package according to file.\n");
 	printf("\t-mv src dst	: Move src to dst.\n");
 	printf("\t-rm file		: delete file.\n");
 	printf("\t-rmdir dir	: delete dir.\n");
 	printf("\n-----------------------\n");
+}
+
+static int csvCheckFile(int iIndex, int iLineNo, char* pLine)
+{
+	//return 0 means OK, other means failed and program shoudl be quit
+	int iRet=0;
+
+	const char* pCsvSeg[16];
+	int iSegCnt;
+
+	//break line to segs.
+	libcsv_getseg(pLine, pCsvSeg, 16);
+
+
+	//check version.
+	switch(pLine[0])
+	{
+		case 'D':
+			printf("<D> %s\n", pCsvSeg[1]);
+			break;
+
+		case 'F':
+			printf("<F> %s\n", pCsvSeg[1]);
+			//file.
+			break;
+
+		case 'S':
+			printf("<S> %s\n", pCsvSeg[1]);
+			//Symbol link.
+			break;
+
+		case 'I':
+			printf("<I> %s\n", pCsvSeg[1]);
+			//information.
+			break;
+
+		default:
+			printf("<U> %s\n", pLine);
+			break;
+	}
+
+
+
+	return iRet;
 }
 
 int main(argc,argv)
@@ -149,6 +195,20 @@ char **argv;
 		//call busybox mv
 		return rmdir_main(3, newgv);
 	}
+
+	//check parameter: -c
+	if(strcmp(argv[1], "-c") == 0)
+	{
+		const char* filename=argv[2];
+
+		//parse csv file.
+		libcsv_init();
+
+		libcsv_parse(filename, csvCheckFile);
+
+	}
+
+
 
 	return 0;
 }
