@@ -288,12 +288,14 @@ typedef unsigned long uoff_t;
 #endif
 #endif
 
+#if 0
 #if defined(__GLIBC__)
 /* glibc uses __errno_location() to get a ptr to errno */
 /* We can just memorize it once - no multithreading in busybox :) */
 extern int *const bb_errno;
 #undef errno
 #define errno (*bb_errno)
+#endif
 #endif
 
 #if !(ULONG_MAX > 0xffffffff)

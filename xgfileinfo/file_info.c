@@ -38,64 +38,87 @@ const char *applet_name;
 	   filename 	single file (default use)
  */   
 
-int main(argc,argv)
-int argc;
-char **argv;	
+//from busybox.
+int mv_main(int argc, char **argv);
+
+//read file list from stdin, normally it's output of find progrem.
+//dump file information to stdout, such as path, type, md5sum, time..
+static int do_file_info(void)
 {
-		char    *pRet=NULL;
-		char    csName[MAX_NAME_LEN];
-		int     count=0;
-		int     len,i,verify_mode;
+	char    *pRet=NULL;
+	char    csName[MAX_NAME_LEN];
+	int     count=0;
+	int     len,i,verify_mode;
 
-	applet_name = argv[0];
 
-	#if 0
-	if(argc>1)
-	for(i=1;i<argc;i++)
-		if(argv[i][0]=='-')
-		{
-			get_info(argv[i+1]);
-			/* use MD5 check */
-			if(strcmp(&argv[i][1],"cm")==0)
-			  {
-				MDFile(argv[i+1]);
-				return 0;
-			   }
-			/* reserve other check module entry in here */
-			else
-				return 0;
-		}
-			/* do nothing but get file info */
-		else
-		{
-			get_info(argv[i]);
-			return 0;
-		}
-	}
-	#endif
+	while(1)
+	{
+		pRet=fgets(csName, MAX_NAME_LEN, stdin);
+		if(NULL == pRet) break;
 
-        while(1)
-        {
-                pRet=fgets(csName, MAX_NAME_LEN, stdin);
-                if(NULL == pRet) break;
-
-                //remove \n
-                len=strlen(csName);
-                if(csName[len-1] == '\n') csName[len-1]=0;
+		//remove \n
+		len=strlen(csName);
+		if(csName[len-1] == '\n') csName[len-1]=0;
 
 		//remov "."
 		if(strcmp(csName, ".") == 0) continue;
 
-                //to stdout.
-                get_info(csName);
-                count++;
-        }
+		//to stdout.
+		get_info(csName);
+		count++;
+	}
 
 	//Show info. I,Fcount,Dcount,Scount,SpaceUsage,ReadSize
 	printf("I,%d,%d,%d,%ld,%d\n", f_iFCount, f_iDCount, f_iSCount,
 		f_lDiskUsage/2, (int)((f_llFileSize-1)/1024+1));
 
-        return 0;
+	return 0;
+}
+
+static int print_usage(void)
+{
+	printf("\nxgfileinfo usage:\n");
+	printf("\t--help		: this screen.\n");
+	printf("\t-u file		: rolling update according to file.\n");
+	printf("\t-d file		: Remove package according to file.\n");
+	printf("\t-mv src dst	: Move src to dst.\n");
+	//printf("\t-rm file		: delete file.\n");
+	printf("\n-----------------------\n");
+}
+
+int main(argc,argv)
+int argc;
+char **argv;	
+{
+	applet_name = argv[0];
+
+	if(argc == 1)
+	{
+		//No argument.
+		return do_file_info();
+	}
+
+	//check parameter.
+	if(strcmp(argv[1], "--help") == 0)
+	{
+		return print_usage();
+	}
+
+	//check parameter.
+	if(strcmp(argv[1], "-mv") == 0)
+	{
+		char *newgv[4];
+
+		newgv[0]="mv";
+		newgv[1]="-f";
+		newgv[2]=argv[2];
+		newgv[3]=argv[3];
+
+		//call busybox mv
+		return mv_main(4, newgv);
+	}
+
+	return 0;
 }
 
 //routine for get file information, such as file tye, file Last Modify Time,

@@ -1,2 +1,2 @@
 autoreconf
-./configure --prefix=/tmp/gpkg
+CFLAGS="-g" ./configure --prefix=/tmp/gpkg
