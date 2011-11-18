@@ -40,6 +40,8 @@ const char *applet_name;
 
 //from busybox.
 int mv_main(int argc, char **argv);
+int rm_main(int argc, char **argv);
+int rmdir_main(int argc, char **argv);
 
 //read file list from stdin, normally it's output of find progrem.
 //dump file information to stdout, such as path, type, md5sum, time..
@@ -82,7 +84,8 @@ static int print_usage(void)
 	printf("\t-u file		: rolling update according to file.\n");
 	printf("\t-d file		: Remove package according to file.\n");
 	printf("\t-mv src dst	: Move src to dst.\n");
-	//printf("\t-rm file		: delete file.\n");
+	printf("\t-rm file		: delete file.\n");
+	printf("\t-rmdir dir	: delete dir.\n");
 	printf("\n-----------------------\n");
 }
 
@@ -98,24 +101,53 @@ char **argv;
 		return do_file_info();
 	}
 
-	//check parameter.
+	//check parameter: help
 	if(strcmp(argv[1], "--help") == 0)
 	{
 		return print_usage();
 	}
 
-	//check parameter.
+	//check parameter: mv
 	if(strcmp(argv[1], "-mv") == 0)
 	{
-		char *newgv[4];
+		char *newgv[5];
 
 		newgv[0]="mv";
 		newgv[1]="-f";
 		newgv[2]=argv[2];
 		newgv[3]=argv[3];
+		newgv[4]=NULL;
 
 		//call busybox mv
 		return mv_main(4, newgv);
+	}
+
+	//check parameter: rm
+	if(strcmp(argv[1], "-rm") == 0)
+	{
+		char *newgv[4];
+
+		newgv[0]="rm";
+		//newgv[1]="-r";
+		newgv[1]=argv[2];
+		newgv[2]=NULL;
+
+		//call busybox mv
+		return rm_main(3, newgv);
+	}
+
+	//check parameter: rmdir
+	if(strcmp(argv[1], "-rmdir") == 0)
+	{
+		char *newgv[4];
+
+		newgv[0]="rmdir";
+		//newgv[1]="-r";
+		newgv[1]=argv[2];
+		newgv[2]=NULL;
+
+		//call busybox mv
+		return rmdir_main(3, newgv);
 	}
 
 	return 0;
