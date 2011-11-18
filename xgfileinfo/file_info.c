@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <time.h>
 #include "libcsv.h"
+#include "finfo.h"
 
 extern  int MDFile(const char *pName, char* pMd5Sum, int iBufLen);
 
@@ -95,9 +96,11 @@ static int csvCheckFile(int iIndex, int iLineNo, char* pLine)
 {
 	//return 0 means OK, other means failed and program shoudl be quit
 	int iRet=0;
+	FINFO real, rec;
 
 	const char* pCsvSeg[16];
 	int iSegCnt;
+	int iResult;
 
 	//break line to segs.
 	libcsv_getseg(pLine, pCsvSeg, 16);
@@ -107,17 +110,55 @@ static int csvCheckFile(int iIndex, int iLineNo, char* pLine)
 	switch(pLine[0])
 	{
 		case 'D':
-			printf("<D> %s\n", pCsvSeg[1]);
+			finfo_get(pCsvSeg[1], &real);
+			finfo_getFromCSVSeg(pCsvSeg, 16, &rec);
+			iResult=finfo_cmp(&real, &rec, FINFO_CKMASK_DIR);
+
+			if(iResult == 0)
+			{
+				printf("<D> <PASS> %s\n", pCsvSeg[1]);
+			}
+			else
+			{
+				printf("<D> <FAIL> %s\n", pCsvSeg[1]);
+			}
+
 			break;
 
 		case 'F':
-			printf("<F> %s\n", pCsvSeg[1]);
 			//file.
+			finfo_get(pCsvSeg[1], &real);
+			finfo_getFromCSVSeg(pCsvSeg, 16, &rec);
+			iResult=finfo_cmp(&real, &rec, FINFO_CKMASK_FILE);
+
+			if(iResult == 0)
+			{
+				printf("<F> <PASS> %s\n", pCsvSeg[1]);
+			}
+			else
+			{
+				printf("<F> <FAIL> %s\n", pCsvSeg[1]);
+			}
+
+
 			break;
 
 		case 'S':
-			printf("<S> %s\n", pCsvSeg[1]);
 			//Symbol link.
+			finfo_get(pCsvSeg[1], &real);
+			finfo_getFromCSVSeg(pCsvSeg, 16, &rec);
+			iResult=finfo_cmp(&real, &rec, FINFO_CKMASK_LINK);
+
+			if(iResult == 0)
+			{
+				printf("<S> <PASS> %s\n", pCsvSeg[1]);
+			}
+			else
+			{
+				printf("<S> <FAIL> %s\n", pCsvSeg[1]);
+			}
+
+
 			break;
 
 		case 'I':
@@ -224,11 +265,11 @@ int get_info(char* csFileName)
 	struct stat 	info;
 	int 		mask_test;
 	long int	t_modify;
-        long int	iTestSize;
-        char            csTestSum[128];
+    long int	iTestSize;
+    char            csTestSum[128];
 	char		*pOutName;
 
-        //type 'F' , name, mode, LMT, size, cksum
+    //type 'F' , name, mode, LMT, size, cksum
 	//printf("file name is :%s\n",csFileName);
 	if(lstat(csFileName,&info)!=0)
 	{
