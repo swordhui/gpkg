@@ -77,6 +77,9 @@ History:
 
 	0.10.11
 		1. colourful output
+
+	0.10.12
+		1. add "gpkg -c package" to check package integrity
 		
 		
 

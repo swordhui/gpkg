@@ -29,6 +29,9 @@ XG_I18N="en zh_CN"
 #GIT server
 XG_GITSVR="git://github.com/swordhui/xglibs.git"
 
+#parameters for wget
+XG_WGET_PARA=""
+
 #color defines
 ## Set color commands, used via $ECHO
 # Please consult `man console_codes for more information
@@ -58,6 +61,7 @@ gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-S file 		$NORMAL\tsearch which package file belongs to\n
 	$INFO\t-d package 	$NORMAL\tdownload package\n
 	$INFO\t-i package 	$NORMAL\tinstall package\n
+	$INFO\t-c package 	$NORMAL\tcheck package integrity\n
 	$INFO\t-D package 	$NORMAL\tremove package\n
 	$INFO\t-I  		$NORMAL\t\tlist installed package\n
 	$INFO\t-l package 	$NORMAL\tlist all files in installed package\n
@@ -470,7 +474,7 @@ check_and_download_raw()
 			[ -f ${XGPATH_SOURCE}/${fname}.tmp ] && \
 				rm -f ${XGPATH_SOURCE}/${fname}.tmp 
 
-			wget $1 -O ${XGPATH_SOURCE}/${fname}.tmp
+			wget $XG_WGET_PARA $1 -O ${XGPATH_SOURCE}/${fname}.tmp
 			if [ "$?" == "0" ]; then
 				#download ok.
 				mv ${XGPATH_SOURCE}/${fname}.tmp ${XGPATH_SOURCE}/${fname}
@@ -904,6 +908,68 @@ gpkg_begininstall()
 	showOK "[***] $N-$V$R installed to your system."
 	return 0
 }
+
+
+gpkg_do_checksum_package()
+{
+	local files=$(ls $XGPATH_DB/$1/$2/*.xgb)
+	local file
+	local count
+	local -a value
+	local t1
+	local t2
+	local tsize
+	local infofile
+
+	for file in $files
+	do
+		file=${file##*/}
+		atom_parse $file
+		T=$1
+		XGPATH_SCRIPT=$XGPATH_DB/$1/$2
+
+		infofile=$XGPATH_SCRIPT/$N-$V$R.file
+
+		#call xgfile to check package.
+		xgfileinfo -c "$infofile"
+
+
+	done
+
+	showOK "[***] $N-$V$R removed."
+
+
+}
+
+#check packge integrity. $1 is atom with type, such as "app-editors/vim-7.2.404"
+#or only name with version, such as "vim-7.2.404"
+#or only name, such as "vim"
+gpkg_checksum()
+{
+	local gpkg_types
+	local type
+	local gpkg_packs
+	local pack
+	local findcount=0
+
+	gpkg_types=`ls $XGPATH_DB 2>/dev/null`
+	for type in $gpkg_types
+	do
+		gpkg_packs=`ls $XGPATH_DB/$type 2>/dev/null`
+		for pack in $gpkg_packs
+		do
+			if [ "$pack" == "$1" ]; then
+				#find, remove
+				gpkg_do_checksum_package $type $pack
+				findcount=$(($findcount+1))
+			fi
+		done
+	done
+
+	[ "$findcount" == "0" ] && showFailed "package $1 not found"
+
+}
+	
 
 #install packge. $1 is atom with type, such as "app-editors/vim-7.2.404"
 #or only name with version, such as "vim-7.2.404"
@@ -1612,6 +1678,10 @@ case "${1}" in
 -D)
 	#remove package
 	gpkg_remove_package $2
+	;;
+
+-c)
+	gpkg_checksum $2
 	;;
 
 -I)
