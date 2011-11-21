@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <time.h>
+#include "libcsv.h"
+#include "finfo.h"
 
 extern  int MDFile(const char *pName, char* pMd5Sum, int iBufLen);
 
@@ -28,6 +30,7 @@ static long 	f_lDiskUsage=0;
 static int	f_iDCount=0;
 static int	f_iFCount=0;
 static int	f_iSCount=0;
+const char *applet_name;
 
 /*
 	Arguments 
@@ -37,62 +40,218 @@ static int	f_iSCount=0;
 	   filename 	single file (default use)
  */   
 
-int main(argc,argv)
-int argc;
-char **argv;	
+//from busybox.
+int mv_main(int argc, char **argv);
+int rm_main(int argc, char **argv);
+int rmdir_main(int argc, char **argv);
+
+//read file list from stdin, normally it's output of find progrem.
+//dump file information to stdout, such as path, type, md5sum, time..
+static int do_file_info(void)
 {
-        char    *pRet=NULL;
-        char    csName[MAX_NAME_LEN];
-        int     count=0;
-        int     len,i,verify_mode;
+	char    *pRet=NULL;
+	char    csName[MAX_NAME_LEN];
+	int     count=0;
+	int     len,i,verify_mode;
 
-	#if 0
-	if(argc>1)
-	for(i=1;i<argc;i++)
-		if(argv[i][0]=='-')
-		{
-			get_info(argv[i+1]);
-			/* use MD5 check */
-			if(strcmp(&argv[i][1],"cm")==0)
-			  {
-				MDFile(argv[i+1]);
-				return 0;
-			   }
-			/* reserve other check module entry in here */
-			else
-				return 0;
-		}
-			/* do nothing but get file info */
-		else
-		{
-			get_info(argv[i]);
-			return 0;
-		}
-	}
-	#endif
 
-        while(1)
-        {
-                pRet=fgets(csName, MAX_NAME_LEN, stdin);
-                if(NULL == pRet) break;
+	while(1)
+	{
+		pRet=fgets(csName, MAX_NAME_LEN, stdin);
+		if(NULL == pRet) break;
 
-                //remove \n
-                len=strlen(csName);
-                if(csName[len-1] == '\n') csName[len-1]=0;
+		//remove \n
+		len=strlen(csName);
+		if(csName[len-1] == '\n') csName[len-1]=0;
 
 		//remov "."
 		if(strcmp(csName, ".") == 0) continue;
 
-                //to stdout.
-                get_info(csName);
-                count++;
-        }
+		//to stdout.
+		get_info(csName);
+		count++;
+	}
 
 	//Show info. I,Fcount,Dcount,Scount,SpaceUsage,ReadSize
 	printf("I,%d,%d,%d,%ld,%d\n", f_iFCount, f_iDCount, f_iSCount,
 		f_lDiskUsage/2, (int)((f_llFileSize-1)/1024+1));
 
-        return 0;
+	return 0;
+}
+
+static int print_usage(void)
+{
+	printf("\nxgfileinfo usage:\n");
+	printf("\t--help		: this screen.\n");
+	printf("\t-u file		: rolling update according to file.\n");
+	printf("\t-d file		: Remove package according to file.\n");
+	printf("\t-c file		: check package according to file.\n");
+	printf("\t-mv src dst	: Move src to dst.\n");
+	printf("\t-rm file		: delete file.\n");
+	printf("\t-rmdir dir	: delete dir.\n");
+	printf("\n-----------------------\n");
+}
+
+static int csvCheckFile(int iIndex, int iLineNo, char* pLine)
+{
+	//return 0 means OK, other means failed and program shoudl be quit
+	int iRet=0;
+	FINFO real, rec;
+
+	const char* pCsvSeg[16];
+	int iSegCnt;
+	int iResult;
+
+	//break line to segs.
+	libcsv_getseg(pLine, pCsvSeg, 16);
+
+
+	//check version.
+	switch(pLine[0])
+	{
+		case 'D':
+			finfo_get(pCsvSeg[1], &real);
+			finfo_getFromCSVSeg(pCsvSeg, 16, &rec);
+			iResult=finfo_cmp(&real, &rec, FINFO_CKMASK_DIR);
+
+			if(iResult == 0)
+			{
+				printf("<D> <PASS> %s\n", pCsvSeg[1]);
+			}
+			else
+			{
+				printf("<D> <FAIL> %s\n", pCsvSeg[1]);
+			}
+
+			break;
+
+		case 'F':
+			//file.
+			finfo_get(pCsvSeg[1], &real);
+			finfo_getFromCSVSeg(pCsvSeg, 16, &rec);
+			iResult=finfo_cmp(&real, &rec, FINFO_CKMASK_FILE);
+
+			if(iResult == 0)
+			{
+				printf("<F> <PASS> %s\n", pCsvSeg[1]);
+			}
+			else
+			{
+				printf("<F> <FAIL> %s\n", pCsvSeg[1]);
+			}
+
+
+			break;
+
+		case 'S':
+			//Symbol link.
+			finfo_get(pCsvSeg[1], &real);
+			finfo_getFromCSVSeg(pCsvSeg, 16, &rec);
+			iResult=finfo_cmp(&real, &rec, FINFO_CKMASK_LINK);
+
+			if(iResult == 0)
+			{
+				printf("<S> <PASS> %s\n", pCsvSeg[1]);
+			}
+			else
+			{
+				printf("<S> <FAIL> %s\n", pCsvSeg[1]);
+			}
+
+
+			break;
+
+		case 'I':
+			printf("<I> %s\n", pCsvSeg[1]);
+			//information.
+			break;
+
+		default:
+			printf("<U> %s\n", pLine);
+			break;
+	}
+
+
+
+	return iRet;
+}
+
+int main(argc,argv)
+int argc;
+char **argv;	
+{
+	applet_name = argv[0];
+
+	if(argc == 1)
+	{
+		//No argument.
+		return do_file_info();
+	}
+
+	//check parameter: help
+	if(strcmp(argv[1], "--help") == 0)
+	{
+		return print_usage();
+	}
+
+	//check parameter: mv
+	if(strcmp(argv[1], "-mv") == 0)
+	{
+		char *newgv[5];
+
+		newgv[0]="mv";
+		newgv[1]="-f";
+		newgv[2]=argv[2];
+		newgv[3]=argv[3];
+		newgv[4]=NULL;
+
+		//call busybox mv
+		return mv_main(4, newgv);
+	}
+
+	//check parameter: rm
+	if(strcmp(argv[1], "-rm") == 0)
+	{
+		char *newgv[4];
+
+		newgv[0]="rm";
+		//newgv[1]="-r";
+		newgv[1]=argv[2];
+		newgv[2]=NULL;
+
+		//call busybox mv
+		return rm_main(3, newgv);
+	}
+
+	//check parameter: rmdir
+	if(strcmp(argv[1], "-rmdir") == 0)
+	{
+		char *newgv[4];
+
+		newgv[0]="rmdir";
+		//newgv[1]="-r";
+		newgv[1]=argv[2];
+		newgv[2]=NULL;
+
+		//call busybox mv
+		return rmdir_main(3, newgv);
+	}
+
+	//check parameter: -c
+	if(strcmp(argv[1], "-c") == 0)
+	{
+		const char* filename=argv[2];
+
+		//parse csv file.
+		libcsv_init();
+
+		libcsv_parse(filename, csvCheckFile);
+
+	}
+
+
+
+	return 0;
 }
 
 //routine for get file information, such as file tye, file Last Modify Time,
@@ -106,11 +265,11 @@ int get_info(char* csFileName)
 	struct stat 	info;
 	int 		mask_test;
 	long int	t_modify;
-        long int	iTestSize;
-        char            csTestSum[128];
+    long int	iTestSize;
+    char            csTestSum[128];
 	char		*pOutName;
 
-        //type 'F' , name, mode, LMT, size, cksum
+    //type 'F' , name, mode, LMT, size, cksum
 	//printf("file name is :%s\n",csFileName);
 	if(lstat(csFileName,&info)!=0)
 	{
@@ -165,3 +324,10 @@ int get_info(char* csFileName)
 
 	return 0;
 }
+
+void bb_show_usage(void)
+{   
+	//fputs(APPLET_full_usage "\n", stdout);
+	exit(EXIT_FAILURE);
+}
+
