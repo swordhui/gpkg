@@ -14,6 +14,7 @@
 #include <time.h>
 #include "libcsv.h"
 #include "finfo.h"
+#include "bprogress.h"
 
 extern  int MDFile(const char *pName, char* pMd5Sum, int iBufLen);
 
@@ -92,6 +93,27 @@ static int print_usage(void)
 	printf("\n-----------------------\n");
 }
 
+
+static int show_progress(int iFilePass, int iFileErr)
+{
+	char csInfo[80];	
+
+	sprintf(csInfo, "%d records PASS, %d records FAIL", iFilePass, iFileErr);
+	bp_clear();
+	bp_printf(csInfo);
+}
+
+static f_iPassCnt=0;
+static f_iFailCnt=0;
+
+static void show_error(const char* fname, int iResult, FINFO* pReal,
+	FINFO* pRecord)
+{
+	bp_clear();
+	finfo_showResult(iResult, fname, pReal, pRecord);
+	printf("\n");
+}
+
 static int csvCheckFile(int iIndex, int iLineNo, char* pLine)
 {
 	//return 0 means OK, other means failed and program shoudl be quit
@@ -115,13 +137,17 @@ static int csvCheckFile(int iIndex, int iLineNo, char* pLine)
 			iResult=finfo_cmp(&real, &rec, FINFO_CKMASK_DIR);
 
 			if(iResult == 0)
-			{
-				printf("<D> <PASS> %s\n", pCsvSeg[1]);
-			}
+				//pass.
+				f_iPassCnt++;
+			
 			else
 			{
-				printf("<D> <FAIL> %s\n", pCsvSeg[1]);
+				f_iFailCnt++;
+				show_error(pCsvSeg[1], iResult, &real, &rec);
 			}
+
+			show_progress(f_iPassCnt, f_iFailCnt);
+		
 
 			break;
 
@@ -132,14 +158,17 @@ static int csvCheckFile(int iIndex, int iLineNo, char* pLine)
 			iResult=finfo_cmp(&real, &rec, FINFO_CKMASK_FILE);
 
 			if(iResult == 0)
-			{
-				printf("<F> <PASS> %s\n", pCsvSeg[1]);
-			}
+				//pass.
+				f_iPassCnt++;
+			
 			else
 			{
-				printf("<F> <FAIL> %s\n", pCsvSeg[1]);
+				f_iFailCnt++;
+				show_error(pCsvSeg[1], iResult, &real, &rec);
 			}
 
+			show_progress(f_iPassCnt, f_iFailCnt);
+		
 
 			break;
 
@@ -150,28 +179,30 @@ static int csvCheckFile(int iIndex, int iLineNo, char* pLine)
 			iResult=finfo_cmp(&real, &rec, FINFO_CKMASK_LINK);
 
 			if(iResult == 0)
-			{
-				printf("<S> <PASS> %s\n", pCsvSeg[1]);
-			}
+				//pass.
+				f_iPassCnt++;
+			
 			else
 			{
-				printf("<S> <FAIL> %s\n", pCsvSeg[1]);
+				f_iFailCnt++;
+				show_error(pCsvSeg[1], iResult, &real, &rec);
 			}
 
+			show_progress(f_iPassCnt, f_iFailCnt);
 
+		
 			break;
 
 		case 'I':
-			printf("<I> %s\n", pCsvSeg[1]);
+			//printf("<I> %s\n", pCsvSeg[1]);
 			//information.
 			break;
 
 		default:
-			printf("<U> %s\n", pLine);
+			bp_clear();
+			printf("<U> %s\n\n", pLine);
 			break;
 	}
-
-
 
 	return iRet;
 }
@@ -242,11 +273,14 @@ char **argv;
 	{
 		const char* filename=argv[2];
 
+		bp_init();
+
 		//parse csv file.
 		libcsv_init();
 
 		libcsv_parse(filename, csvCheckFile);
 
+		printf("\n\n");
 	}
 
 

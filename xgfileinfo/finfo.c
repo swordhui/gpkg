@@ -138,8 +138,6 @@ int finfo_cmp(FINFO* src, FINFO* dst, int ckmask)
 	{
 		//type mismatch.
 		iRet |= FINFO_CMP_FAIL_TYPE;
-		printf("Err! Type Mismatch, file: %s, real: %c, record: %c\n",
-			src->pName, src->type, dst->type);
 		goto ENDFUNC;
 	}
 
@@ -148,8 +146,6 @@ int finfo_cmp(FINFO* src, FINFO* dst, int ckmask)
 	{
 		//type mismatch.
 		iRet |= FINFO_CMP_FAIL_SIZE;
-		printf("Err! Size Mismatch, file: %s, real: %ld, record: %ld\n",
-			src->pName, src->size, dst->size);
 	}
 
 	//check time.
@@ -157,8 +153,6 @@ int finfo_cmp(FINFO* src, FINFO* dst, int ckmask)
 	{
 		//time mismatch.
 		iRet |= FINFO_CMP_FAIL_TIME;
-		printf("Err! Time Mismatch, file: %s, real: %ld, record: %ld\n",
-			src->pName, src->lastModTime, dst->lastModTime);
 	}
 
 	//check mask.
@@ -166,8 +160,6 @@ int finfo_cmp(FINFO* src, FINFO* dst, int ckmask)
 	{
 		//mask mismatch.
 		iRet |= FINFO_CMP_FAIL_MASK;
-		printf("Err! Mask Mismatch, file: %s, real: %04o, record: %04o\n",
-			src->pName, src->mask, dst->mask);
 	}
 
 	//check uid.
@@ -175,8 +167,6 @@ int finfo_cmp(FINFO* src, FINFO* dst, int ckmask)
 	{
 		//uid mismatch.
 		iRet |= FINFO_CMP_FAIL_UID;
-		printf("Err! UID Mismatch, file: %s, real: %d, record: %d\n",
-			src->pName, src->uid, dst->uid);
 	}
 
 	//check gid.
@@ -184,19 +174,65 @@ int finfo_cmp(FINFO* src, FINFO* dst, int ckmask)
 	{
 		//gid mismatch.
 		iRet |= FINFO_CMP_FAIL_GID;
-		printf("Err! GID Mismatch, file: %s, real: %d, record: %d\n",
-			src->pName, src->gid, dst->gid);
 	}
 
 	if(strcmp(src->csMD5, dst->csMD5) && (ckmask & FINFO_CMP_FAIL_MD5))
 	{
 		//md5 mismatch.
 		iRet |= FINFO_CMP_FAIL_MD5;
-		printf("Err! MD5 Mismatch, file: %s, real: %s, record: %s\n",
-			src->pName, src->csMD5, dst->csMD5);
 	}
 
 ENDFUNC:
 
 	return iRet;
+}
+
+void finfo_showResult(int iResult, const char *name, FINFO* real,
+	FINFO* record)
+{
+	//show file name
+	printf("File: %s\n", name);
+
+	if(iResult & FINFO_CMP_FAIL_MD5)
+	{
+		printf("MD5 Mismatch, real: %s, record: %s\n",
+			real->csMD5, record->csMD5);
+	}
+
+	if(iResult & FINFO_CMP_FAIL_TYPE)
+	{
+		printf("Type Mismatch, real: %c, record: %c\n",
+			real->type, record->type);
+	}
+
+	if(iResult & FINFO_CMP_FAIL_UID)
+	{
+		printf("UID Mismatch, real: %d, record: %d\n",
+			real->uid, record->uid);
+	}
+
+	if(iResult & FINFO_CMP_FAIL_GID)
+	{
+		printf("GID Mismatch, real: %d, record: %d\n",
+			real->gid, record->gid);
+	}
+
+	if(iResult & FINFO_CMP_FAIL_MASK)
+	{
+		printf("Mask Mismatch, real: %04o, record: %04o\n",
+			real->mask, record->mask);
+	}
+
+	if(iResult & FINFO_CMP_FAIL_SIZE)
+	{
+		printf("Size Mismatch, real: %d, record: %d\n",
+			real->size, record->size);
+	}
+
+	if(iResult & FINFO_CMP_FAIL_TIME)
+	{
+		printf("Time Mismatch, real: %d, record: %d\n",
+			real->lastModTime, record->lastModTime);
+	}
+	
 }

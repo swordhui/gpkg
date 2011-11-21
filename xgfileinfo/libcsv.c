@@ -94,7 +94,7 @@ int libcsv_parse(const char* filename, LIBCSV_CALLBACK onNewLine)
 		iIndex++;
 	}
 
-	printf("Parse OK, %d line processed.\n", iLineNum);
+	//printf("Parse OK, %d line processed.\n", iLineNum);
 
 
 ENDFUNC:
