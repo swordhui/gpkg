@@ -1,1 +1,1 @@
-SUBDIRS = xgfileinfo
+SUBDIRS = xgfileinfo gpkg

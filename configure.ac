@@ -6,6 +6,6 @@ AC_PROG_CC
 
 #outputs
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile xgfileinfo//Makefile])
+AC_CONFIG_FILES([Makefile xgfileinfo//Makefile gpkg/Makefile])
 
 AC_OUTPUT
