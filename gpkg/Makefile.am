@@ -1,6 +1,4 @@
-bin_PROGRAMS = gpkg
 
-gpkg_SOURCES = gpkg
+dist_bin_SCRIPTS = gpkg
 
-EXTRA_gpkg_SOURCES = gpkg-test
 
