@@ -52,7 +52,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.12
+gpkg_version=0.10.13
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -936,7 +936,7 @@ gpkg_do_checksum_package()
 
 	done
 
-	showOK "[***] $N-$V$R removed."
+	showOK "[***] check $N-$V$R done."
 
 
 }

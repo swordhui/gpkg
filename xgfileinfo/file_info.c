@@ -110,8 +110,9 @@ static void show_error(const char* fname, int iResult, FINFO* pReal,
 	FINFO* pRecord)
 {
 	bp_clear();
+	fprintf(stderr, "\n");
 	finfo_showResult(iResult, fname, pReal, pRecord);
-	printf("\n");
+	fprintf(stderr, "\n");
 }
 
 static int csvCheckFile(int iIndex, int iLineNo, char* pLine)

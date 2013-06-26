@@ -191,48 +191,57 @@ void finfo_showResult(int iResult, const char *name, FINFO* real,
 	FINFO* record)
 {
 	//show file name
-	printf("File: %s\n", name);
+	fprintf(stderr, "File: %s\n", name);
 
 	if(iResult & FINFO_CMP_FAIL_MD5)
 	{
-		printf("MD5 Mismatch, real: %s, record: %s\n",
+		fprintf(stderr, "MD5 Mismatch, real: %s, record: %s\n",
 			real->csMD5, record->csMD5);
 	}
 
 	if(iResult & FINFO_CMP_FAIL_TYPE)
 	{
-		printf("Type Mismatch, real: %c, record: %c\n",
+		fprintf(stderr, "Type Mismatch, real: %c, record: %c\n",
 			real->type, record->type);
 	}
 
 	if(iResult & FINFO_CMP_FAIL_UID)
 	{
-		printf("UID Mismatch, real: %d, record: %d\n",
+		fprintf(stderr, "UID Mismatch, real: %d, record: %d\n",
 			real->uid, record->uid);
 	}
 
 	if(iResult & FINFO_CMP_FAIL_GID)
 	{
-		printf("GID Mismatch, real: %d, record: %d\n",
+		fprintf(stderr, "GID Mismatch, real: %d, record: %d\n",
 			real->gid, record->gid);
 	}
 
 	if(iResult & FINFO_CMP_FAIL_MASK)
 	{
-		printf("Mask Mismatch, real: %04o, record: %04o\n",
+		fprintf(stderr, "Mask Mismatch, real: %04o, record: %04o\n",
 			real->mask, record->mask);
 	}
 
 	if(iResult & FINFO_CMP_FAIL_SIZE)
 	{
-		printf("Size Mismatch, real: %d, record: %d\n",
+		fprintf(stderr, "Size Mismatch, real: %d, record: %d\n",
 			real->size, record->size);
 	}
 
 	if(iResult & FINFO_CMP_FAIL_TIME)
 	{
-		printf("Time Mismatch, real: %d, record: %d\n",
-			real->lastModTime, record->lastModTime);
+		char csRealTime[64];
+		char csRecTime[64];
+
+		ctime_r(&real->lastModTime, csRealTime);
+		ctime_r(&record->lastModTime, csRecTime);
+
+		csRecTime[strlen(csRecTime)-1] = 0;
+		csRealTime[strlen(csRealTime)-1] = 0;
+
+		fprintf(stderr, "Time Mismatch, real: %s, record: %s\n",
+			csRealTime, csRecTime);
 	}
 	
 }
