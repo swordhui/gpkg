@@ -70,6 +70,7 @@ gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-chroot path	$NORMAL\tchroot to new system, for system installing\n
 	$INFO\t-unchroot path	$NORMAL\tun-chroot\n
 	$INFO\t-rdep package	$NORMAL\tshow reverse dependence\n
+	$INFO\t-pack dir name version 	$NORMAL\tpack all files in dir to xgb file.\n
 	$INFO\t-info		$NORMAL\t\tshow gpkg parameters. to modify parameters, gpkg info > /etc/xgparas, then edit /etc/xgparas\n
 XianGe base is at $XGPATH\n
 "
@@ -749,9 +750,59 @@ gpkg_gzip_info()
   		-exec gzip '{}' ';' 2>/dev/null
 }
 
-gpkg_mkpackage()
+
+#make .xgb file from  $XGPATH_DEST
+gpkg_dopack()
 {
 	local destpath="$XGPATH_DEST/$XGPATH_DB/$T/$N"
+
+	#generate file list
+	cd $XGPATH_DEST
+	find | xgfileinfo > /tmp/file-$N-$V$R
+	err_check "call xgfileinfo failed."
+
+	mkdir -p $destpath
+	err_check "[Error] create db directory failed."
+
+	#file list
+	mv /tmp/file-$N-$V$R $destpath/$N-$V$R.file
+	err_check "[Error] move file list failed."
+
+	#configure result and zip it.
+	if [ -f /tmp/xiange/$N-$V$R.config ]; then
+		mv /tmp/xiange/$N-$V$R.config $destpath
+		gzip $destpath/$N-$V$R.config
+	fi
+
+	#test result and zip it.
+	if [ -f /tmp/xiange/$N-$V$R.test ]; then
+		mv /tmp/xiange/$N-$V$R.test $destpath
+		gzip $destpath/$N-$V$R.test
+	fi
+
+	#copy scripts file
+	if [ -f $XGPATH_SCRIPT/$N-$V$R.xgb ]; then
+		cp $XGPATH_SCRIPT/$N-$V$R.xgb $destpath/
+		err_check "[Error] move file list failed."
+	fi
+
+
+	#add configuration parameters
+	echo $XGB_CONFIG > $destpath/$N-$V$R.para
+
+	#date time
+	date +%F,%T > $destpath/$N-$V$R.date
+
+	#tar it.
+	mkdir -p $XGPATH_PACKAGE
+	showinfo ">> make packages... please wait a minute"
+	tar cjpf $XGPATH_PACKAGE/$N-$V$R.xgp *
+	showinfo ">> $XGPATH_PACKAGE/$N-$V$R.xgp done." 
+
+}
+
+gpkg_mkpackage()
+{
 
 	#strip i18n
 	gpkg_strip_i18n $XGPATH_DEST/usr/share
@@ -768,40 +819,8 @@ gpkg_mkpackage()
 	gpkg_gzip_man $XGPATH_DEST
 	gpkg_gzip_info $XGPATH_DEST
 
-	#generate file list
-	cd $XGPATH_DEST
-	find | xgfileinfo > /tmp/file-$N-$V$R
-	err_check "call xgfileinfo failed."
+	gpkg_dopack
 
-	mkdir -p $destpath
-	err_check "[Error] create db directory failed."
-
-	#file list
-	mv /tmp/file-$N-$V$R $destpath/$N-$V$R.file
-	err_check "[Error] move file list failed."
-
-	#configure result and zip it.
-	mv /tmp/xiange/$N-$V$R.config $destpath
-	gzip $destpath/$N-$V$R.config
-
-	#test result and zip it.
-	mv /tmp/xiange/$N-$V$R.test $destpath
-	gzip $destpath/$N-$V$R.test
-
-	#copy scripts file
-	cp $XGPATH_SCRIPT/$N-$V$R.xgb $destpath/
-	err_check "[Error] move file list failed."
-
-	#add configuration parameters
-	echo $XGB_CONFIG > $destpath/$N-$V$R.para
-
-	#date time
-	date +%F,%T > $destpath/$N-$V$R.date
-
-	#tar it.
-	mkdir -p $XGPATH_PACKAGE
-	showinfo ">> make packages... please wait a minute"
-	tar cjpf $XGPATH_PACKAGE/$N-$V$R.xgp *
 
 }
 
@@ -1860,6 +1879,42 @@ stage[0-4])
 -rdep)
 	#show reverse dep for specified library
 	gpkg_rdep "$2"
+	;;
+
+-pack)
+	#check paras
+	if [ -z "$2" ]; then
+			echo "Please specify directory contains package files."
+			exit 1
+	fi
+
+	if [ -z "$3" ]; then
+			echo "Please specify package name."
+			exit 1
+	fi
+
+	if [ -z "$4" ]; then
+			echo "Please specify package version"
+			exit 1
+	fi
+
+	
+	T="pack"
+	N=$3
+	V=$4
+	R=$5
+	XGPATH_PACKAGE=/tmp
+
+	#copy all files to pack directory.
+	rm -rf $XGPATH_DEST
+	mkdir -p $XGPATH_DEST
+	cp -a $2/* $XGPATH_DEST
+
+	echo packing $N-$V$R...
+
+	gpkg_dopack
+
+	#copy all files to dest 
 	;;
 *)
 	#show usage 
