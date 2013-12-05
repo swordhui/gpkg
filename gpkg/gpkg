@@ -7,7 +7,7 @@
 #
 
 #path define
-XGPATH=/var/xiange
+XGPATH=$XGROOT/var/xiange
 XGPATH_TOOLS=$XGPATH/tools
 XGPATH_LIB=$XGPATH/xglibs
 XGPATH_SOURCE=$XGPATH/sources
@@ -52,7 +52,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.13
+gpkg_version=0.10.14
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
