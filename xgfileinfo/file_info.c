@@ -82,7 +82,7 @@ static int do_file_info(void)
 
 static int print_usage(void)
 {
-	printf("\nxgfileinfo usage:\n");
+	printf("\nxgfileinfo v0.9 usage:\n");
 	printf("\t--help		: this screen.\n");
 	printf("\t-u file		: rolling update according to file.\n");
 	printf("\t-d file		: Remove package according to file.\n");
@@ -172,6 +172,29 @@ static int csvCheckFile(int iIndex, int iLineNo, char* pLine)
 		
 
 			break;
+
+		case 'O':
+			//other file, char/block/fifo
+			finfo_get(pCsvSeg[1], &real);
+			finfo_getFromCSVSeg(pCsvSeg, 16, &rec);
+			iResult=finfo_cmp(&real, &rec, FINFO_CKMASK_DIR);
+
+			if(iResult == 0)
+				//pass.
+				f_iPassCnt++;
+			
+			else
+			{
+				f_iFailCnt++;
+				show_error(pCsvSeg[1], iResult, &real, &rec);
+			}
+
+			show_progress(f_iPassCnt, f_iFailCnt);
+		
+
+			break;
+
+
 
 		case 'S':
 			//Symbol link.
@@ -341,6 +364,19 @@ int get_info(char* csFileName)
 
 		f_iDCount++;
 		f_lDiskUsage+=info.st_blocks;
+	}
+	else if(S_ISBLK(info.st_mode) || S_ISCHR(info.st_mode) || 
+			S_ISFIFO(info.st_mode))
+	{
+		//others file, output "F,Name,Size,Mask,uid, gid,LMT,Md5Sum
+		printf("O,%s,%d,%04o,%d,%d,%d,%04x\n", pOutName, iTestSize,
+			mask_test&FILE_MODE_MASK, info.st_uid, info.st_gid,
+			t_modify, info.st_mode);
+
+		f_iFCount++;
+		f_lDiskUsage+=info.st_blocks;
+		f_llFileSize+=iTestSize;
+
 	}
 	else
 	{
