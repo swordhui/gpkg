@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.18
+gpkg_version=0.10.19
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -456,9 +456,9 @@ gpkg_search()
 
 	#type?
 	if [ -n "$T" ]; then
-		results=$(find $XGPATH_LIB -iname "$iname" | grep "/$T/")
+		results=$(find -L $XGPATH_LIB -iname "$iname" | grep "/$T/")
 	else
-		results=$(find $XGPATH_LIB -iname "$iname")
+		results=$(find -L $XGPATH_LIB -iname "$iname")
 	fi
 
 	for pack in $results
@@ -556,9 +556,9 @@ gpkg_getxgbfile()
 
 	#type?
 	if [ -n "$T" ]; then
-		results=$(find $XGPATH_LIB -type d -iname "$iname" | grep "/$T/")
+		results=$(find -L $XGPATH_LIB -type d -iname "$iname" | grep "/$T/")
 	else
-		results=$(find $XGPATH_LIB -type d -iname "$iname")
+		results=$(find -L $XGPATH_LIB -type d -iname "$iname")
 	fi
 
 	for pack in $results
@@ -583,9 +583,9 @@ gpkg_getxgbfile()
 
 	#no results. search xgbfile
 	if [ -n "$T" ]; then
-		results=$(find $XGPATH_LIB  -iname "$N.xgb" | grep "/$T/")
+		results=$(find -L $XGPATH_LIB  -iname "$N.xgb" | grep "/$T/")
 	else
-		results=$(find $XGPATH_LIB  -iname "$N.xgb")
+		results=$(find -L $XGPATH_LIB  -iname "$N.xgb")
 	fi
 
 	count=0
@@ -1556,7 +1556,7 @@ gpkg_search_belonging()
 	local -a value
 
 
-	packags=$(grep ",$1," `find $XGPATH_DB -iname "*.file"`)
+	packags=$(grep ",$1," `find -L $XGPATH_DB -iname "*.file"`)
 	for i in $packags
 	do
 		((outcnt++))
@@ -1635,7 +1635,7 @@ gpkg_check_rdep()
 	local name
 	local value
 
-	packags=$(grep ",$1," `find $XGPATH_DB -iname "*.file"`)
+	packags=$(grep ",$1," `find -L $XGPATH_DB -iname "*.file"`)
 	for i in $packags
 	do
 
