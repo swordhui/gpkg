@@ -21,8 +21,8 @@ XGPATH_UNPACK=/tmp/xiange/sources
 XGPATH_DEST=/tmp/xiange/pack
 
 #compile parameters
-CC=gcc
-CXX=g++
+XGB_ARCH=i386
+XGB_PREFIX=
 CFLAGS="-march=native -mtune=native -O2 -fomit-frame-pointer -pipe"
 CXXFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.19
+gpkg_version=0.10.22
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -630,8 +630,6 @@ gpkg_begin_download()
 	err_check "[Error] $XGPATH_LIB/template.xgb not found."
 
 	#prepare XGB_CONFIG, CFLAGS, CPPFLAGS, XGINST_PREFIX
-	export CC=$CC
-	export CXX=$CXX
 	export CFLAGS=$CFLAGS
 	export CXXFLAGS=$CXXFLAGS
 	XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
@@ -743,10 +741,10 @@ gpkg_stip_bin()
 {
 	showinfo ">> strip debug info.."
 	find $1/{,usr/}{bin,sbin} -type f \
-  		-exec strip --strip-all '{}' ';' 2>/dev/null
+  		-exec ${XGB_PREFIX}strip --strip-all '{}' ';' 2>/dev/null
 
 	find $1/{,usr/}lib -type f \
-  		-exec strip --strip-debug '{}' ';' 2>/dev/null
+  		-exec ${XGB_PREFIX}strip --strip-debug '{}' ';' 2>/dev/null
 }
 
 #compress man docs
@@ -1736,8 +1734,8 @@ case "${1}" in
 	echo $gpkg_version
 	;;
 -info)
-	echo "CC=\"$CC\""
-	echo "CXX=\"$CXX\""
+	echo "XGB_ARCH=\"$XGB_ARCH\""
+	echo "XGB_PREFIX=\"$XGB_PREFIX\""
 	echo "CFLAGS=\"$CFLAGS\""
 	echo 'CXXFLAGS="$CFLAGS"'
 	echo "XG_I18N=\"$XG_I18N\""
