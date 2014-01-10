@@ -26,6 +26,7 @@ CXX=g++
 CFLAGS="-march=native -mtune=native -O2 -fomit-frame-pointer -pipe"
 CXXFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
+XGB_CONFIG="$XGINST_PREFIX "
 XG_I18N="en zh_CN"
 
 #GIT server
@@ -54,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.17
+gpkg_version=0.10.18
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -74,7 +75,7 @@ gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-unchroot path	$NORMAL\tun-chroot\n
 	$INFO\t-rdep package	$NORMAL\tshow reverse dependence\n
 	$INFO\t-pack dir name version 	$NORMAL\tpack all files in dir to xgb file.\n
-	$INFO\t-info		$NORMAL\t\tshow gpkg parameters. to modify parameters, gpkg info > /etc/xgparas, then edit /etc/xgparas\n
+	$INFO\t-info		$NORMAL\t\tshow gpkg parameters. to modify parameters, gpkg info > $XGROOT/etc/xgparas, then edit it.\n
 XianGe base is at $XGPATH\n
 "
 
@@ -633,7 +634,6 @@ gpkg_begin_download()
 	export CXX=$CXX
 	export CFLAGS=$CFLAGS
 	export CXXFLAGS=$CXXFLAGS
-	XGB_CONFIG="$XGINST_PREFIX "
 	XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
 
 	#include package build scripts
@@ -1728,7 +1728,7 @@ gpkg_rdep()
 #
 
 #reload parameters if available
-[ -f /etc/xgparas ] && . /etc/xgparas
+[ -f $XGROOT/etc/xgparas ] && . $XGROOT/etc/xgparas
 
 case "${1}" in
 -v)
@@ -1741,6 +1741,7 @@ case "${1}" in
 	echo "CFLAGS=\"$CFLAGS\""
 	echo 'CXXFLAGS="$CFLAGS"'
 	echo "XG_I18N=\"$XG_I18N\""
+	echo "XGB_CONFIG=\"$XGB_CONFIG\""
 	;;
 
 -s)
