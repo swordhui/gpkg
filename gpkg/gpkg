@@ -56,7 +56,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.23
+gpkg_version=0.10.24
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -941,9 +941,9 @@ gpkg_begininstall()
 
 	if [ "$pack_only" == "0" ]; then
 		#copy to root
-		showinfo ">> Moving files to / ..."
-		tar xjpf $XGPATH_PACKAGE/$N-$V$R.xgp -C /
-		err_check "[Error] copy binary package to / failed"
+		showinfo ">> Moving files to $XGROOT/ ..."
+		tar xjpf $XGPATH_PACKAGE/$N-$V$R.xgp -C $XGROOT/
+		err_check "[Error] copy binary package to $XGROOT/ failed"
 		showinfo ">> Install OK, cleaning up.."
 	
 		#post install
