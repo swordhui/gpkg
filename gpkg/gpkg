@@ -21,8 +21,9 @@ XGPATH_UNPACK=/tmp/xiange/sources
 XGPATH_DEST=/tmp/xiange/pack
 
 #compile parameters
-XGB_ARCH=i386
-XGB_PREFIX=
+XGB_ARCH=i686
+XGB_TARGET=i686-pc-linux-gnu
+XGB_PREFIX=${XGB_TARGET}-
 CFLAGS="-march=native -mtune=native -O2 -fomit-frame-pointer -pipe"
 CXXFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
@@ -33,7 +34,7 @@ XG_I18N="en zh_CN"
 XG_GITSVR="git://github.com/swordhui/xglibs.git"
 
 #parameters for wget
-XG_WGET_PARA=""
+XG_WGET_PARA="--no-check-certificate"
 
 #color defines
 ## Set color commands, used via $ECHO
@@ -55,7 +56,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.22
+gpkg_version=0.10.23
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
