@@ -56,7 +56,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.25
+gpkg_version=0.10.26
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -1211,7 +1211,7 @@ gpkg_csvop_check_file()
 			showFailed "FAIL (F) $cname exists, please unload installed package."
 			exit 5
 		else
-			echo  "OK  (F)  $cname"
+			echo  "OK   (F) $cname"
 		fi
 		;;
 	D)
