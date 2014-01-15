@@ -17,8 +17,9 @@ XGPATH_DB=$XGPATH/db
 XGPATH_DB_RAW=$XGPATH_RAW/db
 XGPATH_SdbCRIPT=$XGPATH_LIB
 
-XGPATH_UNPACK=/tmp/xiange/sources
-XGPATH_DEST=/tmp/xiange/pack
+XGPATH_BUILD=/tmp/xiange
+XGPATH_UNPACK=
+XGPATH_DEST=
 
 #compile parameters
 XGB_ARCH=i686
@@ -56,7 +57,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.26
+gpkg_version=0.10.27
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -794,14 +795,14 @@ gpkg_dopack()
 	err_check "[Error] move file list failed."
 
 	#configure result and zip it.
-	if [ -f /tmp/xiange/$N-$V$R.config ]; then
-		mv /tmp/xiange/$N-$V$R.config $destpath
+	if [ -f $XGPATH_BUILD/$N-$V$R.config ]; then
+		mv $XGPATH_BUILD/$N-$V$R.config $destpath
 		gzip $destpath/$N-$V$R.config
 	fi
 
 	#test result and zip it.
-	if [ -f /tmp/xiange/$N-$V$R.test ]; then
-		mv /tmp/xiange/$N-$V$R.test $destpath
+	if [ -f $XGPATH_BUILD/$N-$V$R.test ]; then
+		mv $XGPATH_BUILD/$N-$V$R.test $destpath
 		gzip $destpath/$N-$V$R.test
 	fi
 
@@ -895,9 +896,13 @@ gpkg_begininstall()
 {
 	local ret=0
 
+	XGPATH_BUILD=/tmp/xiange/$N-$V$R
+	XGPATH_UNPACK=$XGPATH_BUILD/source
+	XGPATH_DEST=$XGPATH_BUILD/pack
+
 
 	# DO RM WITH CAUTION!! 
-	rm -rf /tmp/xiange/sources
+	rm -rf $XGPATH_BUILD
 
 	showinfo ">> unpacking $N-$V$R..."
 	mkdir -p $XGPATH_UNPACK
@@ -906,14 +911,14 @@ gpkg_begininstall()
 	err_check "[Error] call xgb_unpack failed"
 
 	#call config and store config result
-	rm -f /tmp/xiange/$N-$V$R.pipe
-	mkfifo /tmp/xiange/$N-$V$R.pipe
-	tee /tmp/xiange/$N-$V$R.config < /tmp/xiange/$N-$V$R.pipe & 
-	xgb_config >  /tmp/xiange/$N-$V$R.pipe
+	rm -f $XGPATH_BUILD/$N-$V$R.pipe
+	mkfifo $XGPATH_BUILD/$N-$V$R.pipe
+	tee $XGPATH_BUILD/$N-$V$R.config < $XGPATH_BUILD/$N-$V$R.pipe & 
+	xgb_config >  $XGPATH_BUILD/$N-$V$R.pipe
 	if [ "$?" != "0" ]; then
 		sleep 1
 		echo "[Error] call xgb_config failed"
-		rm -f /tmp/xiange/$N-$V$R.pipe
+		rm -f $XGPATH_BUILD/$N-$V$R.pipe
 		exit 1
 	fi
 
@@ -923,13 +928,12 @@ gpkg_begininstall()
 
 	#check if possiable, and ignore result
 	#store information to /tmp/xiange/$N-$V$R.test
-	rm -f /tmp/xiange/$N-$V$R.pipe2
-	mkfifo /tmp/xiange/$N-$V$R.pipe2
-	tee /tmp/xiange/$N-$V$R.test < /tmp/xiange/$N-$V$R.pipe2 & 
-	xgb_check > /tmp/xiange/$N-$V$R.pipe2
+	rm -f $XGPATH_BUILD/$N-$V$R.pipe2
+	mkfifo $XGPATH_BUILD/$N-$V$R.pipe2
+	tee $XGPATH_BUILD/$N-$V$R.test < $XGPATH_BUILD/$N-$V$R.pipe2 & 
+	xgb_check > $XGPATH_BUILD/$N-$V$R.pipe2
 
 	#call install
-	XGPATH_DEST=/tmp/xiange/pack/$N-$V$R
 	rm -rf $XGPATH_DEST
 	mkdir -p $XGPATH_DEST
 	xgb_install
@@ -947,7 +951,7 @@ gpkg_begininstall()
 	fi
 
 	#clean up
-	rm -rf /tmp/xiange
+	rm -rf $XGPATH_BUILD
 	return 0
 }
 
