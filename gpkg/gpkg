@@ -56,7 +56,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.28
+gpkg_version=0.10.28.1
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -2050,7 +2050,9 @@ stage[0-4])
 	N=$3
 	V=$4
 	R=$5
-	XGPATH_PACKAGE=/tmp
+	XGPATH_BUILD=/tmp/xiange/$N-$V$R
+	XGPATH_DEST=$XGPATH_BUILD/pack
+
 
 	#copy all files to pack directory.
 	rm -rf $XGPATH_DEST
