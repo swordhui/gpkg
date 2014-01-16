@@ -21,9 +21,8 @@ XGPATH_BUILD=/tmp/xiange
 XGPATH_DEST=
 
 #compile parameters
-XGB_ARCH=i686
-XGB_TARGET=i686-pc-linux-gnu
-XGB_PREFIX=${XGB_TARGET}-
+XGB_ARCH=$(uname -m)
+XGB_PREFIX=
 CFLAGS="-march=native -mtune=native -O2 -fomit-frame-pointer -pipe"
 CXXFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
