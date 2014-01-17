@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.29
+gpkg_version=0.10.30
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -80,7 +80,9 @@ XianGe base is at $XGPATH\n
 "
 
 #only pack?
-pack_only="0"
+if [ "x$pack_only" == "x" ]; then
+	pack_only="0"
+fi
 
 gpkg_show_usage()
 {
@@ -893,7 +895,7 @@ gpkg_checkInst()
 	return 1
 }
 
-gpkg_begininstall()
+gpkg_beginbuild()
 {
 	local ret=0
 
@@ -933,6 +935,63 @@ gpkg_begininstall()
 	tee $XGPATH_BUILD/$N-$V$R.test < $XGPATH_BUILD/$N-$V$R.pipe2 & 
 	xgb_check > $XGPATH_BUILD/$N-$V$R.pipe2
 
+	#stort current path
+
+	pwd > $XGPATH_BUILD/install_path
+
+}
+
+gpkg_begin_install()
+{
+	local newest
+	local ret
+	local itype
+	local iname
+	local iver
+	local irver
+	local buildpath
+
+	#parse input 
+	#echo "atom=$1"
+	atom_parse_type "$1"
+	itype=$T
+	iname=$N
+	iver=$V
+	irver=$R
+
+	#get xgb file
+	gpkg_getxgbfile $1
+	err_check "get xgb file of $1 failed.";
+
+	atom_parse_path $newest
+
+	#echo N=$N, V=$V, T=$T
+	#include file.
+	. $XGPATH_LIB/template.xgb
+	err_check "include xgb template file failed."
+
+	#call init
+	XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
+	echo script=$XGPATH_SCRIPT/$N-$V$R.xgb
+	. $XGPATH_SCRIPT/$N-$V$R.xgb
+	err_check "include xgb file failed."
+
+	xgb_init > /dev/null 2>&1
+	err_check "call xgb_init failed"
+
+
+	XGPATH_BUILD=/tmp/xiange/$N-$V$R
+	XGPATH_DEST=$XGPATH_BUILD/pack
+
+	buildpath=$(cat $XGPATH_BUILD/install_path)
+	echo "installing in $buildpath"
+
+	pushd $buildpath > /dev/null
+	gpkg_do_install
+}
+
+gpkg_do_install()
+{
 	#call install
 	rm -rf $XGPATH_DEST
 	mkdir -p $XGPATH_DEST
@@ -1020,7 +1079,7 @@ gpkg_checksum()
 #install packge. $1 is atom with type, such as "app-editors/vim-7.2.404"
 #or only name with version, such as "vim-7.2.404"
 #or only name, such as "vim"
-gpkg_install()
+gpkg_do_build()
 {
 	local newest
 	local ret
@@ -1052,7 +1111,7 @@ gpkg_install()
 		ret=$?
 		if [ $? == 0 ]; then
 			#download ok, install it.
-			gpkg_begininstall $newest
+			gpkg_beginbuild $newest
 		else
 			return $ret
 		fi
@@ -1063,6 +1122,32 @@ gpkg_install()
 	fi
 }
 
+#install packge. $1 is atom with type, such as "app-editors/vim-7.2.404"
+#or only name with version, such as "vim-7.2.404"
+#or only name, such as "vim"
+gpkg_install()
+{
+	local patom="$1"
+	#check if you're root
+	if [ "$UID" != "0" ]; then
+		showFailed "Installation need root privilege"
+		exit 1
+	fi
+
+	#check if user gpkg avalible
+	su -p gpkg -c "echo XGROOT is at $XGROOT/"
+
+	if [ "$?" != "0" ]; then
+		echo "create user gpkg for package compiling..."
+		useradd -d /tmp -l -M gpkg
+		err_check "create user gpkg failed."
+	fi
+
+	#su -p gpkg -c "gpkg -buildraw $patom"
+
+	#no need root privilege to install package.
+	gpkg_begin_install "$patom"
+}
 
 
 
@@ -1834,14 +1919,21 @@ case "${1}" in
 	;;
 
 -i)
-	gpkg_install $2
+	gpkg_install "$2"
 	;;
 
 -ip)
 	pack_only="1"
-	gpkg_install $2
+	export pack_only=$pack_only
+	gpkg_install "$2"
 	;;
 
+-buildraw)
+	#internal user only.
+	#echo "pack=$pack_only"
+
+	gpkg_do_build "$2"
+	;;
 
 -D)
 	#remove package
@@ -1861,6 +1953,7 @@ case "${1}" in
 	#list files in packet.
 	gpkg_list_package "$2"
 	;;
+
 -ib)
 	gpkg_install_binary_package "$2"
 	;;
