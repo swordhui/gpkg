@@ -1,47 +1,100 @@
 gpkg : UI interface for Xiange Linux package management system.
 
-to Make
-	make CFLAGS=xxx CC=xxx
-	default CFLAG is "-O2"
-	default CC is "gcc"
 
 to Install
-	make DESTDIR=xxx prefix=xxx BASH_PATH=xxx install
-	gpkg and xgfileinfo will be installed to ${DESTDIR}${prefix}/bin
-	default ${DESTDIR} is ""
-	default ${prefix} is ""
-	default ${BASH_PATH} is "${prefix}/bin"
 
-	Sample:
-		make install
-			prefix="", BASH_PATH="/bin"
-			gpkg and xgfileinfo will be installed to /bin
-			gpkg is invoked by "/bin/bash" 
-
-		make prefix=/tools install
-			prefix="/tools", BASH_PATH="/tools/bin"
-			gpkg and xgfileinfo will be installed to /tools/bin
-			gpkg is invoked by "/tools/bin/bash" 
+	configure
+	make
+	make install 
+	just same as auto-tools based packages.
 
 
-		make prefix=/usr BASH_PATH=/bin install
-			prefix="/usr", BASH_PATH="/bin"
-			gpkg and xgfileinfo will be installed to /usr/bin
-			gpkg is invoked by "/bin/bash" 
-
+Dependence:
+	Bash 
+	Coreutils
+	Tar >= 1.27.1 
+	findutils
+	gawk
+	sed
+	grep
+	git
 
 History:
+	0.10.31 2014-01-17 17:57
+		Rolling upgrade finally works!!!
 
-	0.10.1  2010-04-16,17:53
+	0.10.30 2014-01-17 13:00
+		1. support privilege switch now. download/decompress/configure/make/check in normal privilege, pack/install in root privilege.
+		2. continue download if failed.
 
-		1. call xgb_prerm before remove all files/directorys
-		2. add git config when sync xglibs at the first time
+	0.10.29 2014-01-17 09:58
+		do not overwrite symlink directories. need tar-1.27.1 
 
-	0.10.2
-		1. build binary package file xgp, and -ib command to install it.
-		2. stip useless i18n translations, zip man/info docs
-		3. add xgb_check, and store xgb_check results
-		4. add CFLAGS/CPPFLAGS for package compiling
+	0.10.28
+		set default ARCH to $(uname -m)
+
+	0.10.27 2014-01-15 11:14
+		can do more package installations in the same time now.
+
+	0.10.25 2014-01-14 17:56
+		check file before overwrite it.
+
+	0.10.24 2014-01-13 11:55
+		fixed bug: XGROOT problem in gpkg -i.
+
+	0.10.23 2014-01-13 09:47
+		add --no-check-certificate to wget parameters.
+		change default ARCH to i686.
+
+	0.10.22 2014-01-10 11:27
+		fixed cross-compiling bugs.
+
+	0.10.19 2014-01-10 10:27
+		fixed XGROOT bugs.
+
+	0.10.18 2014-01-10 09:52
+		1. enable xgpars in XGROOT directory to support cross-compiling .
+		2. xgfileinfo: support block/char/fifo device file now.
+
+	0.10.17 2014-01-10 09:52
+		add "-ip" parameter: only download/decompress/configure/make/pack, no install.
+
+	0.10.14 2013-12-05 06:22
+		add XGROOT to list/install packages others than /. (for cross-compiling)
+		add "-pack" parameter to pack a directory to a .xgp package.
+		
+		
+	0.10.12
+		add "gpkg -c package" to check package integrity
+
+	0.10.11
+		colourful output
+
+	0.10.10
+		check the size of tmpfs before using it.
+
+	0.10.9
+		1. fixed CXX/CXXFLAGS bug.
+		2. add "-rdep" command for reverse dep. searching.
+
+	0.10.8
+		Support stage2
+
+	0.10.7
+		1. gdd -info command to show parameters
+		2. load /etc/xgparas if available for new parameters
+
+	0.10.6
+		1. add command -chroot, -unchroot 
+		2. create /etc/hosts to fix git system error.
+
+	0.10.5
+		1. quit if package has already installed.
+
+	0.10.4 
+		1. add CC macro 
+		2. add DESTDIR for installation
+		4. update README
 
 	0.10.3
 		1. add make test
@@ -49,37 +102,18 @@ History:
 		3. add auto-build script for stage1
 		4. add -S and -F command
 
-	0.10.4 
-		1. add CC macro 
-		2. add DESTDIR for installation
-		4. update README
+	0.10.2
+		1. build binary package file xgp, and -ib command to install it.
+		2. stip useless i18n translations, zip man/info docs
+		3. add xgb_check, and store xgb_check results
+		4. add CFLAGS/CPPFLAGS for package compiling
 
-	0.10.5
-		1. quit if package has already installed.
+	0.10.1  2010-04-16,17:53
 
-	0.10.6
-		1. add command -chroot, -unchroot 
-		2. create /etc/hosts to fix git system error.
+		1. call xgb_prerm before remove all files/directorys
+		2. add git config when sync xglibs at the first time
 
-	0.10.7
-		1. gdd -info command to show parameters
-		2. load /etc/xgparas if available for new parameters
 
-	0.10.8
-		1. Support stage2
-
-	0.10.9
-		1. fixed CXX/CXXFLAGS bug.
-		2. add "-rdep" command for reverse dep. searching.
-
-	0.10.10
-		1. check the size of tmpfs before using it.
-
-	0.10.11
-		1. colourful output
-
-	0.10.12
-		1. add "gpkg -c package" to check package integrity
 		
 		
 
