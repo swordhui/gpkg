@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.28.1
+gpkg_version=0.10.29
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -823,6 +823,7 @@ gpkg_dopack()
 	mkdir -p $XGPATH_PACKAGE
 	showinfo ">> make packages... please wait a minute"
 	tar cjpf $XGPATH_PACKAGE/$N-$V$R.xgp *
+	err_check "make package failed."
 	showinfo ">> $XGPATH_PACKAGE/$N-$V$R.xgp done." 
 
 }
@@ -1586,7 +1587,7 @@ gpkg_install_binary_package()
 
 	#copy to root
 	showinfo ">> Moving files to $XGROOT/ ..."
-	tar xjpf "$1" -C $XGROOT/
+	tar xjpf "$1" --keep-directory-symlink -C $XGROOT/ 
 	err_check "[Error] copy binary package to / failed"
 	showinfo ">> Install OK, cleaning up.."
 
