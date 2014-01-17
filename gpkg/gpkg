@@ -499,8 +499,10 @@ check_and_download_raw()
 		else
 			printf "downloading from %s, retry %d...\n" ${1} ${retry}
 
-			[ -f ${XGPATH_SOURCE}/${fname}.tmp ] && \
-				rm -f ${XGPATH_SOURCE}/${fname}.tmp 
+			if [ -f ${XGPATH_SOURCE}/${fname}.tmp ]; then
+				XG_WGET_PARA+=" -c"
+			fi
+			
 
 			wget $XG_WGET_PARA $1 -O ${XGPATH_SOURCE}/${fname}.tmp
 			if [ "$?" == "0" ]; then
