@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.30
+gpkg_version=0.10.31
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -868,6 +868,7 @@ gpkg_rm_packgeinfo()
 	#remove scripts file
 	echo "remove file $destpath/$N-$V$R.xgb"
 	rm -f $destpath/$N-$V$R.xgb
+	err_check ">> Remove $N-$V$R failed."
 
 	#remove list file
 	echo "remove file $destpath/$N-$V$R.file"
@@ -891,8 +892,22 @@ gpkg_rm_packgeinfo()
 #Check if already insalled. $T/$N$V 
 gpkg_checkInst()
 {
-	[ -f $XGPATH_DB/$T/$N/$N-$V$R.file ] && return 0
-	return 1
+	local ifile
+
+	oldinst_atom=""
+
+	ifile=$(find $XGPATH_DB/$T/$N -iname "*.file" | head -n 1)
+
+	if [ "x$ifile" != "x" ]; then
+		#found
+		oldinst_atom=$(basename $ifile .file)
+		return 1
+	else
+		#not found
+		return 0
+	fi
+
+	#[ -f $XGPATH_DB/$T/$N/$N-$V$R.file ] && return 0
 }
 
 gpkg_beginbuild()
@@ -945,7 +960,6 @@ gpkg_begin_install()
 {
 	local newest
 	local ret
-	local itype
 	local iname
 	local iver
 	local irver
@@ -954,7 +968,6 @@ gpkg_begin_install()
 	#parse input 
 	#echo "atom=$1"
 	atom_parse_type "$1"
-	itype=$T
 	iname=$N
 	iver=$V
 	irver=$R
@@ -972,7 +985,7 @@ gpkg_begin_install()
 
 	#call init
 	XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
-	echo script=$XGPATH_SCRIPT/$N-$V$R.xgb
+	#echo script=$XGPATH_SCRIPT/$N-$V$R.xgb
 	. $XGPATH_SCRIPT/$N-$V$R.xgb
 	err_check "include xgb file failed."
 
@@ -983,7 +996,8 @@ gpkg_begin_install()
 	XGPATH_BUILD=/tmp/xiange/$N-$V$R
 	XGPATH_DEST=$XGPATH_BUILD/pack
 
-	buildpath=$(cat $XGPATH_BUILD/install_path)
+	buildpath=$(cat $XGPATH_BUILD/install_path 2>/dev/null)
+	err_check ">> compile not completed."
 	echo "installing in $buildpath"
 
 	pushd $buildpath > /dev/null
@@ -1083,17 +1097,8 @@ gpkg_do_build()
 {
 	local newest
 	local ret
-	local itype
-	local iname
-	local iver
-	local irver
-
-	#parse input 
-	atom_parse_type $1
-	itype=$T
-	iname=$N
-	iver=$V
-	irver=$R
+	local newv
+	local newr
 
 	#get xgb file
 	gpkg_getxgbfile $1
@@ -1102,9 +1107,21 @@ gpkg_do_build()
 		#check if installed.
 		atom_parse_path $newest
 
+		newv=$V
+		newr=$R
+
 		if [ "$pack_only" == "0" ]; then
-			gpkg_checkInst && showOK ">> $N-$V$R has already been installed." && return 0
+			showinfo ">> checking $T/$N.."
+			gpkg_checkInst
+			if [ "$?" == "1" ]; then
+				atom_parse $oldinst_atom
+				showOK ">> found $N-$V$R. please run gpkg -u to upgrade to $N-$newv$newr."
+				return 0
+			fi
 		fi
+
+		V=$newv
+		R=$newr
 
 		#found, download it
 		gpkg_begin_download $newest
@@ -1143,7 +1160,7 @@ gpkg_install()
 		err_check "create user gpkg failed."
 	fi
 
-	#su -p gpkg -c "gpkg -buildraw $patom"
+	su -p gpkg -c "gpkg -buildraw $patom"
 
 	#no need root privilege to install package.
 	gpkg_begin_install "$patom"
@@ -1157,7 +1174,6 @@ gpkg_showdep()
 {
 	local newest
 	local ret
-	local itype
 	local iname
 	local iver
 	local irver
@@ -1166,7 +1182,6 @@ gpkg_showdep()
 
 	#parse input 
 	atom_parse_type $1
-	itype=$T
 	iname=$N
 	iver=$V
 	irver=$R
@@ -1178,6 +1193,9 @@ gpkg_showdep()
 		#check if installed.
 		atom_parse_path $newest
 		gpkg_checkInst && echo "$N-$V$R already installed." && return 0
+
+		#reset old values
+		atom_parse_path $newest
 
 		#check if in global set.
 
@@ -1266,17 +1284,29 @@ gpkg_csvop_rm_file()
 	S)
 		#symbol.
 		unlink "$XGROOT${value[1]}"
-		printf "Remove link %s\n" "${value[1]}"
+		if [ "$?" == "0" ]; then
+			echo "RM (S) ${value[1]}"
+		else
+			showFailed "RM (S) $XGROOT${value[1]} failed"
+		fi
 		;;
 	F)
 		#file
 		unlink "$XGROOT${value[1]}"
-		printf "Remove file %s\n" "${value[1]}"
+		if [ "$?" == "0" ]; then
+			echo "RM (F) ${value[1]}"
+		else
+			showFailed "RM (F) $XGROOT${value[1]} failed"
+		fi
 		;;
 	O)
 		#device or other
 		unlink "$XGROOT${value[1]}"
-		printf "Remove file %s\n" "${value[1]}"
+		if [ "$?" == "0" ]; then
+			echo "RM (O) ${value[1]}"
+		else
+			showFailed "RM (O) $XGROOT${value[1]} failed"
+		fi
 		;;
 
 	esac
@@ -1324,6 +1354,90 @@ gpkg_csvop_check_file()
 	esac
 	
 }
+
+gpkg_csvop_update_file()
+{
+	local cname
+	local oname
+	local fname
+	local ftype
+
+	oname="${value[1]}"
+	cname="$XGROOT${value[1]}"
+	fname=$(echo $oname | sed "s@\/@\\\/@g")
+	fname=$(echo $fname | sed "s@\[@\\\[@g")
+	ftype=${value[0]}
+
+	case "${value[0]}" in
+	S)
+		#symbol.
+		sed -i "/^S,$fname,/d" $oldfile
+		if [ "$?" == "0" ]; then
+			#found in old package, skip
+			echo  "OK   (US) $cname"
+		else
+			#not found in old package
+			showinfo  "OK   (NS) $XGROOT${value[1]}"
+		fi
+		;;
+	F)
+
+		#check in old file
+		sed -i "/^F,$fname,/d" $oldfile
+		if [ "$?" == "0" ]; then
+			#found in old package, skip
+			echo  "OK   (UF) $cname"
+		else
+			#not found in old packge
+			if [ -f "$cname" ]; then
+				showFailed "FAIL (NF) $cname exists, please unload installed package."
+				exit 5
+			else
+				showinfo  "OK   (NF) $cname"
+			fi
+		fi
+		#file
+		
+		;;
+	D)
+		#dirctory
+		sed -i "/^D,$fname,/d" $oldfile
+		if [ "$?" == "0" ]; then
+			#found in old package, skip
+			echo  "OK   (UD) $cname"
+		else
+			#new directory
+			if [ -f "$cname" ]; then
+				showFailed "FAIL (ND) $cname is a file, please check."
+			else
+				showinfo  "OK   (ND) $cname"
+			fi
+		fi
+		;;
+	I)
+		#info
+		showinfo  ">> check done."
+		;;
+	*)
+		sed -i "/^$ftype,$fname,/d" $oldfile
+		if [ "$?" == "0" ]; then
+			#found in old package, skip
+			echo  "OK   (U$ftype) $cname"
+		else
+			#new directory
+			if [ -a "$cname" ]; then
+				showFailed "FAIL (ND) $cname exists, please check."
+			else
+				showinfo  "OK   (N$ftype) $cname"
+			fi
+		fi
+
+		;;
+	
+	esac
+	
+}
+
 
 gpkg_mark_remove()
 {
@@ -1376,6 +1490,9 @@ gpkg_read()
 			;;
 		c)
 			gpkg_csvop_check_file
+			;;
+		u)
+			gpkg_csvop_update_file
 			;;
 		*)
 			gpkg_csvop_ls
@@ -1509,7 +1626,6 @@ gpkg_list_package()
 #remove packet, $1=type, $2=$N, $3=$V if have, $4=$R if have
 gpkg_do_remove_package()
 {
-	local files=$(ls $XGPATH_DB/$1/$2/*.xgb)
 	local file
 	local count
 	local -a value
@@ -1517,67 +1633,71 @@ gpkg_do_remove_package()
 	local t2
 	local tsize
 	local infofile
+	local xgbfilen
 
-	for file in $files
-	do
-		file=${file##*/}
-		atom_parse $file
+	#echo "T=$1 N=$2 V=$3 R=$4"
 
-		T=$1
-		XGPATH_SCRIPT=$XGPATH_DB/$1/$2
+	XGPATH_SCRIPT=$XGPATH_DB/$1/$2
+	#echo scriptpath $XGPATH_SCRIPT
+	if [ -z "$3$4" ]; then
+		#no version specified
+		file=$(ls $XGPATH_DB/$1/$2/*.xgb 2>/dev/null | head -n 1 )
+	else
+		#version specified.
+		file=$XGPATH_DB/$1/$2/$2-$3$4.xgb
+	fi
 
-		#check version
-		if [ -z "$3$4" ]; then
-			#no version specified
-			echo "no version specified." > /dev/null
-		else 
-			#version specified
-			if [ "$3$4" == "$V$R" ]; then
-				echo "version ckeck ok" 
-			else
-				showFailed "[***] $N-$3$4 not found"
-				return
-			fi
-		fi
+	if [ -z "$file" ]; then
+		return 1
+	fi
+
+	xgbfilen="$file"
+	file=$(basename $file .xgb)
+	atom_parse $file
+	T=$1
+	
+	if [ -a "$xgbfilen" ]; then
+		showinfo "remove $T/$N-$V$R..."
+	else
+		showFailed "$xgbfilen not found."
+		exit 1
+	fi
+
+	infofile=$XGPATH_SCRIPT/$N-$V$R.file
 
 
-		infofile=$XGPATH_SCRIPT/$N-$V$R.file
+	#call init
+	. $XGPATH_SCRIPT/$N-$V$R.xgb
+	err_check "include xgb file failed."
 
+	xgb_init
+	err_check "call xgb_init failed"
 
-		#call init
-		. $XGPATH_SCRIPT/$N-$V$R.xgb
-		err_check "include xgb file failed."
+	#call pre rm
+	xgb_prerm
+	err_check "call xgb_prerm failed"
 
-		xgb_init
-		err_check "call xgb_init failed"
+	#remove all files
+	gpkg_readfile $infofile "f"
 
-		#call pre rm
-		xgb_prerm
-		err_check "call xgb_prerm failed"
+	#reset directory list
+	unset gpkg_mark_remove_array
+	mark_count=0
 
-		#remove all files
-		gpkg_readfile $infofile "f"
+	#record all directorys
+	gpkg_readfile $infofile "d"
 
-		#reset directory list
-		unset gpkg_mark_remove_array
-		mark_count=0
+	#remove all dirs
+	gpkg_reverse_remove
 
-		#record all directorys
-		gpkg_readfile $infofile "d"
+	xgb_postrm
+	err_check "call xgb_postinst failed"
 
-		#remove all dirs
-		gpkg_reverse_remove
+	#remove infos.
+	gpkg_rm_packgeinfo
 
-		xgb_postrm
-		err_check "call xgb_postinst failed"
-
-		#remove infos.
-		gpkg_rm_packgeinfo
-
-	done
 
 	showOK "[***] $N-$V$R removed."
-
 
 }
 
@@ -1628,6 +1748,7 @@ gpkg_install_binary_package()
 	local dbpath
 	local packname
 	local infofile
+	local xippath
 
 	dbpath=${XGPATH_DB_RAW#/}
 	packname=$1
@@ -1656,14 +1777,15 @@ gpkg_install_binary_package()
 		exit 2
 	fi
 	#get .file from packet
-	mkdir -p /tmp/xiange/xib
-	err_check "[Error] make tmp /tmp/xiange/xib failed.\n"
+	xibpath=/tmp/$UID/xiange/xib
+	mkdir -p $xibpath
+	err_check "[Error] make tmp $xibpath failed.\n"
 
 	infofile="var/xiange/db/$T/$N/$N-$V$R.file"
-	tar xf "$packname" -C /tmp/xiange/xib "$infofile" 
+	tar xf "$packname" -C $xibpath "$infofile" 
 	err_check "[Error] get file info from pack failed."
 
-	pushd /tmp/xiange/xib > /dev/null
+	pushd $xibpath > /dev/null
 
 	#check all files
 	gpkg_readfile "$infofile" "c"
@@ -1703,6 +1825,138 @@ gpkg_install_binary_package()
 
 	showOK "[***] Binary package $N-$V$R installed to you system."
 }
+
+gpkg_upgrade_binary_package()
+{
+	local xgbfile
+	local atom
+	local dbpath
+	local packname
+	local infofile
+	local xippath
+	local newv
+	local newr
+	local oldv
+	local oldr
+	local oldsrcfile
+	oldfile=""
+
+	dbpath=${XGPATH_DB_RAW#/}
+	packname=$1
+
+	showinfo ">> parsing $1..."
+	#fine xgbfile in package.
+	xgbfile=$(tar tf "$1" | grep "^$dbpath/.*\.xgb")
+	err_check "get info from xgb file failed."
+
+	#check xgb
+	[ -z "$xgbfile" ] && showFailed "Not xgp format" && exit 1
+
+	xgbfile=${xgbfile#$dbpath}
+	xgbfile=${xgbfile#/}
+	T=${xgbfile%%/*}
+	[ -z "$T" ] && showFailed "Not xgp format" && exit 1
+
+	atom=${xgbfile##*/}
+	atom_parse "$atom"
+
+	newv=$V
+	newr=$R
+
+	showinfo ">> checking $T/$N.."
+	gpkg_checkInst
+	if [ "$?" == "0" ]; then
+		#not installed
+		gpkg_install_binary_package "$1"
+		return $?
+	fi
+
+	atom_parse $oldinst_atom
+	if [ "$V$R" == "$newv$newr" ]; then
+		showOK "$N-$V$R already installed."
+		return 0
+	fi
+
+	showinfo ">> upgrade $N-$V$R to $N-$newv$newr ..."
+	oldv=$V
+	oldr=$R
+	V=$newv
+	R=$newr
+
+	#check XG_DB_RAW
+	if [ "$XGPATH_DB_RAW" != "/var/xiange/db" ]; then
+		showFailed "XGPATH_DB_RAW changed to $XGPATH_DB_RAW."
+		exit 2
+	fi
+	#get .file from packet
+	xibpath=/tmp/$UID/xiange/xib
+	mkdir -p $xibpath
+	err_check "[Error] make tmp $xibpath failed.\n"
+
+	#old .file
+	oldfile=$xibpath/$N-$oldv$oldr.file
+	oldsrcfile=$XGPATH_DB/$T/$N/$N-$oldv$oldr.file
+	cp $oldsrcfile  $oldfile
+	err_check "copy $XGPATH_DB/$T/$N/$N-$oldv$oldr.file failed."
+
+
+
+	infofile="var/xiange/db/$T/$N/$N-$V$R.file"
+	tar xf "$packname" -C $xibpath "$infofile" 
+	err_check "[Error] get file info from pack failed."
+
+	pushd $xibpath > /dev/null
+
+	#check all files
+	gpkg_readfile "$infofile" "u"
+
+	#copy changed old file
+	cp $oldfile $oldsrcfile
+	err_check "change $oldsrcfile failed."
+	popd
+	rm -rf $infofile
+
+	showinfo ">> installing $T/$N-$V$R ..."
+
+	#copy to root
+	showinfo ">> Moving files to $XGROOT/ ..."
+	tar xjpf "$1" --keep-directory-symlink -C $XGROOT/ 
+	err_check "[Error] copy binary package to / failed"
+	showinfo ">> Install OK, cleaning up.."
+
+
+	#remove old files
+	gpkg_do_remove_package "$T" "$N" "$oldv" "$oldr"
+
+	V=$newv
+	R=$newr
+
+	#clear all routines by include template file
+	if [ -f $XGPATH_LIB/template.xgb ]; then
+		. $XGPATH_LIB/template.xgb
+		err_check "[Error] $XGPATH_LIB/template.xgb not found."
+	fi
+
+	#prepare XGB_CONFIG
+	export CFLAGS=$CFLAGS
+	export CPPFLAGS=$CPPFLAGS
+	XGB_CONFIG="$XGINST_PREFIX "
+
+	#include package build scripts
+	XGPATH_SCRIPT=$XGPATH_DB/$T/$N
+	. $XGPATH_SCRIPT/$N-$V$R.xgb
+	err_check "[Error] $XGPATH_SCRIPT/$1 not found."
+
+	#init build script file
+	xgb_init
+
+	#post install
+	xgb_postinst
+	err_check "[Error] call xgb_postinst failed"
+
+	showOK "[***] Binary package $N-$V$R installed to you system."
+}
+
 
 gpkg_search_belonging()
 {
@@ -1957,6 +2211,10 @@ case "${1}" in
 -ib)
 	gpkg_install_binary_package "$2"
 	;;
+-ub)
+	gpkg_upgrade_binary_package "$2"
+	;;
+
 
 -F)
 	gpkg_find_orphans $2
