@@ -1209,7 +1209,8 @@ gpkg_showdep()
 		err_check "include xgb template file failed."
 
 		#call init
-		. $XGPATH_SCRIPT/$T/$N/$N-$V$R.xgb
+		XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
+		. $XGPATH_SCRIPT/$N-$V$R.xgb
 		err_check "include xgb file failed."
 
 		xgb_init > /dev/null 2>&1
