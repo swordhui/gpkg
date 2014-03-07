@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.32.1
+gpkg_version=0.10.33
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -75,6 +75,10 @@ gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-unchroot path	$NORMAL\tun-chroot\n
 	$INFO\t-rdep package	$NORMAL\tshow reverse dependence\n
 	$INFO\t-pack dir name version 	$NORMAL\tpack all files in dir to xgb file.\n
+	$INFO\t-packraw package $NORMAL\tinstall compiled package. need set install_path to path of build directory.\n
+	$INFO\tedit package	$NORMAL\tedit xgb file with vim\n
+	$INFO\tnew type/package-version	$NORMAL\tnew xgb file with vim\n
+	$INFO\trm package-version	$NORMAL\tremove xgb file with vim\n
 	$INFO\t-info		$NORMAL\t\tshow gpkg parameters. to modify parameters, gpkg info > $XGROOT/etc/xgparas, then edit it.\n
 XianGe base is at $XGPATH\n
 "
@@ -192,6 +196,11 @@ atom_parse()
 	V="${RR##*-}"
 	N="${RR%$V}"
 	N="${N%-}"
+
+	#echo "ATOM=$ATOM"
+	#echo "RR=$RR"
+	#echo "R=$R"
+	#echo "V=$V"
 }
 
 #parse with type, such as "app-sys/vim-2.3.5"
@@ -1166,6 +1175,98 @@ gpkg_install()
 	gpkg_begin_install "$patom"
 }
 
+# $1 is package name, such as "glibc"
+gpkg_begin_edit()
+{
+	local newest
+	local ret
+	local iname
+	local iver
+	local irver
+	local dep
+	local leading
+
+	#get xgb file
+	gpkg_getxgbfile $1
+	if [ $? == 0 ]; then
+		vim $newest
+	fi
+}
+
+gpkg_begin_rmxgb()
+{
+	local newest
+	local ret
+	local iname
+	local iver
+	local irver
+	local itype
+	local dep
+	local leading
+
+
+	#get xgb file
+	gpkg_getxgbfile $1
+	if [ $? == 0 ]; then
+		echo "delete $newest? (y/n)"
+		read dep
+
+		if [ "x$dep" == "xy" ]; then
+			rm $newest
+			gpkg_rm_dir_safe $XGPATH_LIB/$T/$N
+		else
+			echo cancel.
+		fi
+	fi
+}
+
+
+#new xgb file, $1 is package name, $2 is version, $3 is type
+gpkg_begin_new()
+{
+	local newest
+	local ret
+	local iname
+	local itype
+	local iver
+	local irver
+	local dep
+	local leading
+
+	#get xgb file
+	gpkg_getxgbfile $1
+	if [ "$?" == "0" ]; then
+		vim $newest
+	else
+		atom_parse $1
+		itype=$N
+		iname=$N
+		iver=$V
+		irver=$R
+		echo n=$N	
+		gpkg_getxgbfile $N
+		if [ $? == 0 ]; then
+			#found
+			cp $newest $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
+			vim $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
+		else
+			if [ "x$itype" == "x" ]; then
+				echo "No type found, should be 'new sys-libs/glibc-2.32'"
+				exit 3
+			fi
+			if [ "x$iver" == "x" ]; then
+				echo "No version found, should be 'new sys-libs/glibc-2.32'"
+				exit 4
+			fi
+			mkdir -p $XGPATH_LIB/$T/$N
+			cp $XGPATH_LIB/template.xgb $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
+			vim $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
+			#echo $XGPATH_LIB/template.xgb 
+			#echo $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
+		fi
+		
+	fi
+}
 
 
 # $1 is package name, such as "glibc"
@@ -2423,6 +2524,20 @@ stage[0-4])
 -packraw)
 	gpkg_begin_install "$2"
 	;;
+
+edit)
+	gpkg_begin_edit "$2"
+	;;
+
+new)
+	gpkg_begin_new "$2"
+	;;
+
+rm)
+	gpkg_begin_rmxgb "$2"
+	;;
+
+
 *)
 	#show usage 
 	gpkg_show_usage
