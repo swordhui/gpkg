@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.33
+gpkg_version=0.10.33.1
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -71,6 +71,7 @@ gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-l package 	$NORMAL\tlist all files in installed package\n
 	$INFO\t-ib xgp_file	$NORMAL\tinstall binary package to system\n
 	$INFO\t-F path		$NORMAL\tfind orphans in path. e.g. not belongs to any package\n
+	$INFO\t-p package	$NORMAL\tshow package dependence\n
 	$INFO\t-chroot path	$NORMAL\tchroot to new system, for system installing\n
 	$INFO\t-unchroot path	$NORMAL\tun-chroot\n
 	$INFO\t-rdep package	$NORMAL\tshow reverse dependence\n
@@ -196,6 +197,11 @@ atom_parse()
 	V="${RR##*-}"
 	N="${RR%$V}"
 	N="${N%-}"
+
+	if [ "x$N" == "x" ]; then
+		N=$V
+		V=""
+	fi
 
 	#echo "ATOM=$ATOM"
 	#echo "RR=$RR"
@@ -2347,7 +2353,7 @@ case "${1}" in
 
 selftest)
 	#include test file
-	. gpkg-test
+	. $(pwd)/gpkg-test
 	err_check "[Error] self test not surpport"
 	gpkg_test_bgin
 	;;

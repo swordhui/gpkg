@@ -55,9 +55,25 @@ gpkg_test_bgin()
 	str_isIn "man8" "man[1-9]"
 	test_showResult test_failed test_ok
 
+	test_showtitle "bash cmp test 1..."
+	if [ "xgood" == "xgood" -a "xv" == "7" -a "x" == "x" ]; then
+		test_failed
+	else
+		test_ok
+	fi
+
+	test_showtitle "bash cmp test 2..."
+	if [ "xgood" == "xgood" -a "xv" == "xv" -a "x" == "x" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+
+
 	test_showtitle "atom parse 1..."
 	atom_parse "vim-2.8.9.xgb"
-	if [ "$N" == "vim" -a "$V" == "2.8.9" -a "$R" == "" ]; then
+	if [ "$N" == "vim" -a "$V" == "2.8.9" -a "x$R" == "x" ]; then
 		test_ok
 	else
 		test_failed
@@ -65,11 +81,8 @@ gpkg_test_bgin()
 
 	#test 2
 	test_showtitle "atom parse 2..."
-	N=""
-	V=""
-	R=""
-	atom_parse "vim-2.8.9-r15"
-	if [ "$N" == "vim" -a "$V" == "2.8.9" -a "$R" == "-r15" ]; then
+	atom_parse "libtest-2.7.9-r15"
+	if [ "$N" == "libtest" -a "$V" == "2.7.9" -a "$R" == "-r15" ]; then
 		test_ok
 	else
 		test_failed
@@ -77,9 +90,6 @@ gpkg_test_bgin()
 
 	#test 2
 	test_showtitle "atom parse 3..."
-	N=""
-	V=""
-	R=""
 	atom_parse "x-org-base-7-r1.xgb"
 	if [ "$N" == "x-org-base" -a "$V" == "7" -a "$R" == "-r1" ]; then
 		test_ok
@@ -89,9 +99,6 @@ gpkg_test_bgin()
 
 	#test 4
 	test_showtitle "atom parse 4..."
-	N=""
-	V=""
-	R=""
 	atom_parse "x-org-r203a-7.xgb"
 	if [ "$N" == "x-org-r203a" -a "$V" == "7" -a "$R" == "" ]; then
 		test_ok
@@ -99,13 +106,37 @@ gpkg_test_bgin()
 		test_failed
 	fi
 
+	#test 5
+	test_showtitle "atom parse 5..."
+	atom_parse "abc"
+	if [ "$N" == "abc" -a "x$V" == "x" -a "x$R" == "x" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#test 6
+	test_showtitle "atom parse 6..."
+	atom_parse "libaaa-3.2.1"
+	if [ "$N" == "libaaa" -a "x$V" == "x3.2.1" -a "x$R" == "x" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+	#test 7
+	test_showtitle "atom parse 7..."
+	atom_parse ""
+	if [ "x$N" == "x" -a "x$V" == "x" -a "x$R" == "x" ]; then
+		test_ok
+	else
+		test_failed
+	fi
+
+
 
 	#atom type parse
 	test_showtitle "atom type parse ..."
-	T=""
-	N=""
-	V=""
-	R=""
 	atom_parse_type "app-sys/x-org-7.4"
 	if [ "$T" == "app-sys" -a "$N" == "x-org-7.4" ]; then
 		test_ok
