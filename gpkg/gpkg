@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.33.4
+gpkg_version=0.10.34
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -341,13 +341,12 @@ gpkg_get_packages()
 #return path of the newest on in $newest
 gpkg_getnewest()
 {
-	local files
 	local file
 	newest=""
 
-	files=`ls $1/*.xgb 2>/dev/null`
-	for file in $files
+	for file in $results
 	do
+		#echo "Check $file"
 		if [ -z $newest ]; then
 			newest=$file
 			#echo "First is $file"
@@ -557,22 +556,27 @@ gpkg_getxgbfile()
 	#echo "N=$N, T=$T"
 
 	#find what?
-	if [ "$N" == "" ]; then
+	if [ "x$N" == "x" ]; then
 		echo "No package specified."
 		echo "Sample: "
 		echo -e "\tgpkg -i vim"
 		echo -e "\tgpkg -i vim-7.2.404"
 		echo -e "\tgpkg -i app-editors/vim-7.2.404"
 		return 1
+	fi
+
+	if [ "x$V" == "x" ]; then
+		#no version specified
+		iname="$N-*.xgb"
 	else
-		iname="$N"
+		iname="$N-$V$R.xgb"
 	fi
 
 	#type?
 	if [ -n "$T" ]; then
-		results=$(find -L $XGPATH_LIB -type d -iname "$iname" | grep "/$T/")
+		results=$(find -L $XGPATH_LIB -iname "$iname" | grep "/$T/")
 	else
-		results=$(find -L $XGPATH_LIB -type d -iname "$iname")
+		results=$(find -L $XGPATH_LIB -iname "$iname")
 	fi
 
 	for pack in $results
@@ -582,49 +586,23 @@ gpkg_getxgbfile()
 		#echo "$count $pack"
 	done
 
-	if [ "$count" == "1" ]; then
-		#found 1.
-		gpkg_getnewest $results
-		return 0
+	#echo result=$results, V=$V, R=$R
+	if [ "$count" == "0" ]; then
+		#not found
+		showFailed "Not found."
+		return 2
 	fi
-
-	if [ "$count"0 -gt 10 ]; then
-		#more results
-		echo "Too more results"
-		echo $results
-		return 1
-	fi
-
-	#no results. search xgbfile
-	if [ -n "$T" ]; then
-		results=$(find -L $XGPATH_LIB  -iname "$N.xgb" | grep "/$T/")
-	else
-		results=$(find -L $XGPATH_LIB  -iname "$N.xgb")
-	fi
-
-	count=0
-	for pack in $results
-	do
-		#atom_parse_path $pack
-		count=$(($count + 1))
-		#echo "$count $pack"
-	done
 
 	if [ "$count" == "1" ]; then
-		#found 1.
-		newest=$results
+		#found 
+		newest=$pack
+		#echo "found $newest"
 		return 0
+
 	fi
 
-	if [ "$count"0 -gt 10 ]; then
-		#more results
-		echo "Too more results"
-		echo $results
-		return 1
-	fi
-
-	echo "Not found."
-	return 2
+	#more results, get the newest one
+	gpkg_getnewest
 }
 
 #begin download, $1 is atom with path,  such as 
@@ -1154,98 +1132,144 @@ gpkg_do_build()
 	fi
 }
 
-#install packge. $1 is atom with type, such as "app-editors/vim-7.2.404"
-#or only name with version, such as "vim-7.2.404"
-#or only name, such as "vim"
-gpkg_install_dep()
+
+#check packeg status. $1 is specified atom such as "vim-7.3.2" or "vim"
+#return 0: no need upgrade. $newest is the newtest version xgb file 
+#return 1: need upgrade. $newest is newest xgb file. $oldinst_atom is current atom
+#return 2: need downgrade. $newest is newest xgb file. $oldinst_atom is current atom
+#return 3: package is not installed, need installed to $newest
+#return 4: package is not found
+#others: error
+
+gpkg_check_packge()
 {
-	local newest
-	local ret
+	local inst_atom
 	local iname
 	local iver
 	local irver
 	local nname
 	local nver
 	local nrver
-	local dep
-	local leading
-	local inst_atom
-	
+
 	#get xgb file
 	gpkg_getxgbfile $1
 	if [ "$?" == "0" ]; then
-
 		#check if installed.
 		atom_parse_path $newest
 		gpkg_checkInst
-		inst_atom=$oldinst_atom
-
-		echo "newest:    $newest"
-		echo "installed: $inst_atom"
-
-		#reset old values
-		atom_parse_path $newest
-		nname="$N"
-		nver="$V"
-		nrver="$R"
-
-		atom_parse $inst_atom
-		iname="$N"
-		iver="$V"
-		irver="$R"
-
-		#compare
-		atom_cmp "$iname-$iver$irver" "$nname-$nver$nrver"
-		echo "$?"
-		return 0
-
-
-
-		#check if in global set.
-
-		#not in global set, add it.
-
-		#found, include and print deps
-		#echo ">>> begin show $newest.."
-
-		#include file.
-		. $XGPATH_LIB/template.xgb
-		err_check "include xgb template file failed."
-
-		#call init
-		XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
-		. $XGPATH_SCRIPT/$N-$V$R.xgb
-		err_check "include xgb file failed."
-
-		xgb_init > /dev/null 2>&1
-		err_check "call xgb_init failed"
-
-		#show package
-		if [ -z "$inst_atom" ]; then
-			#not installed
-			showFailed "${2} ${1} (Not Installede)"
+		if [ "$?" == "0" ]; then 
+			#not installed.
+			return 3 
 		else
-			showinfo "${2} $inst_atom"
+			#installed. check version
+			inst_atom=$oldinst_atom
+
+			echo "newest:    $newest"
+			echo "installed: $inst_atom"
+
+			#reset old values
+			atom_parse_path $newest
+			nname="$N"
+			nver="$V"
+			nrver="$R"
+
+			atom_parse $inst_atom
+			iname="$N"
+			iver="$V"
+			irver="$R"
+
+			#compare
+			atom_cmp "$iname-$iver$irver" "$nname-$nver$nrver"
+			case "$?" in
+			"0")
+				#echo "Same. No need upgrade"
+				return 0
+				;;
+			"1")
+				#echo "need downgrade"
+				return 2
+				;;
+			"2")
+				#echo "need upgrade"
+				return 1
+				;;
+			*)
+				return -1 
+				;;
+			esac
+
 		fi
-
-		#check if package installed.
-		#show all deps
-		#echo ">>> DEP = $DEPEND"
-
-		leading="${2}    "
-		for dep in $DEPEND
-		do
-			gpkg_showdep "$dep" "$leading"	
-			err_check "Error: DEP $dep Not found."
-		done
-		
 	else
-		#not found
-		return 1
+		#package not found
+		return 4
 	fi
 
+}
 
+#install packge. $1 is atom with type, such as "app-editors/vim-7.2.404"
+#or only name with version, such as "vim-7.2.404"
+#or only name, such as "vim"
+gpkg_install_dep()
+{
+	local npath
+	local iatom
+	local ret
+	local dep
+	local leading
+	local patom="$1"
+	
+	gpkg_check_packge "$1"
+	case "$?" in
+	"0")
+		#no need update, return directly
+		atom_parse_path $newest
+		showOK "$T/$N-$V$R has already been installed"
+		return 0;
+		;;
+
+	"1")
+		#need upgrade
+		;;
+
+	"2")
+		#need downgrade
+		;;
+
+	"3")
+		#need install 
+		;;
+
+	"*")
+		#error
+		return 4
+	esac
+
+	atom_parse_path $newest
+	showinfo "check dependances for $T/$N-$V$R..."
+
+	#include file.
+	. $XGPATH_LIB/template.xgb
+	err_check "include xgb template file failed."
+
+	#call init
+	XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
+	. $XGPATH_SCRIPT/$N-$V$R.xgb
+	err_check "include xgb file failed."
+
+	xgb_init > /dev/null 2>&1
+	err_check "call xgb_init failed"
+
+	for dep in $DEPEND
+	do
+		gpkg_install_dep "$dep"
+		err_check "Error: install $dep failed."
+	done
+
+
+		
+	
 	#check depdents
+	showinfo "install $T/$N-$V$R..."
 
 	su -p gpkg -c "export PATH=$PATH; gpkg -buildraw $patom"
 
