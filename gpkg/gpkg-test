@@ -104,6 +104,7 @@ gpkg_test_bgin()
 		test_ok
 	else
 		test_failed
+		showFailed "parse x-org-r203a-7.xgb failed, N=$N, V=$V, R=$R"
 	fi
 
 	#test 5
@@ -137,8 +138,8 @@ gpkg_test_bgin()
 
 	#atom type parse
 	test_showtitle "atom type parse ..."
-	atom_parse_type "app-sys/x-org-7.4"
-	if [ "$T" == "app-sys" -a "$N" == "x-org-7.4" ]; then
+	atom_parse "app-sys/x-org-7.4"
+	if [ "$T" == "app-sys" -a "$N" == "x-org" -a "$V" == "7.4" ]; then
 		test_ok
 	else
 		test_failed
@@ -150,8 +151,8 @@ gpkg_test_bgin()
 	N=""
 	V=""
 	R=""
-	atom_parse_type "x-org-7.4"
-	if [ "$T" == "" -a "$N" == "x-org-7.4" ]; then
+	atom_parse "x-org-7.6"
+	if [ "x$T" == "x" -a "$N" == "x-org" -a "$V" == "7.6" ]; then
 		test_ok
 	else
 		test_failed
@@ -163,7 +164,7 @@ gpkg_test_bgin()
 	N=""
 	V=""
 	R=""
-	atom_parse_type "app-sys/"
+	atom_parse "app-sys/"
 	if [ "$T" == "app-sys" -a "$N" == "" ]; then
 		test_ok
 	else
@@ -242,5 +243,6 @@ gpkg_test_bgin()
 		test_ok
 	else
 		test_failed
+		showFailed "T=$T, N=$N, V=$V, R=$R"
 	fi
 }

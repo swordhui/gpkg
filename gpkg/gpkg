@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.33.1
+gpkg_version=0.10.33.3
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -186,37 +186,32 @@ err_check()
 
 #parse atom to $N, $V, $R, 
 #by tomgrean @ LinuxSir, 2009-09-11, 20:02
+#improved by Sword, 2014-03-10
 atom_parse()
 {
 	local ATOM
-	local RR
+	local VR
+	local ATOM_ALL
 
-	ATOM="${1%.xgb}"
-	RR="${ATOM%-r[0-9]*}"
-	R="${ATOM#$RR}"
-	V="${RR##*-}"
-	N="${RR%$V}"
-	N="${N%-}"
 
-	if [ "x$N" == "x" ]; then
-		N=$V
-		V=""
-	fi
+	ATOM_ALL="${1%.xgb}"
 
-	#echo "ATOM=$ATOM"
-	#echo "RR=$RR"
-	#echo "R=$R"
-	#echo "V=$V"
-}
-
-#parse with type, such as "app-sys/vim-2.3.5"
-#return type and name. 
-atom_parse_type()
-{
-	N=${1##*/}
-	T=${1%$N}
+	#get T
+	ATOM=${ATOM_ALL##*/}
+	T=${ATOM_ALL%$ATOM}
 	T=${T%/}
+	T=${T##*/}
+
+	N="${ATOM%-[0-9]*}"
+	VR="${ATOM##$N}"
+	VR="${VR##-}"
+	#echo "T=$T, N=$N, VR=$VR"
+
+
+	V="${VR%-r[0-9]*}"
+	R="${VR##$V}"
 }
+
 
 #parse with path, suchas "/var/xiange/db/app-editor/vim/vim-7.2.401.xgb"
 atom_parse_path()
@@ -228,7 +223,7 @@ atom_parse_path()
 	T=${T%/*}
 	T=${T##*/}
 
-	atom_parse "$atom"
+	atom_parse "$T/$atom"
 }
 
 #compare 2 versions, such 2.6.9 and 2.6.10
@@ -460,7 +455,7 @@ gpkg_search()
 	#echo "p1=$1"
 
 	#parae input files
-	atom_parse_type $1
+	atom_parse $1
 
 	#echo "N=$N, T=$T"
 
@@ -557,7 +552,7 @@ gpkg_getxgbfile()
 	#echo "p1=$1"
 
 	#parae input files
-	atom_parse_type $1
+	atom_parse $1
 
 	#echo "N=$N, T=$T"
 
@@ -911,11 +906,16 @@ gpkg_checkInst()
 
 	oldinst_atom=""
 
+	#echo "T=$T, N=$N"
+
 	ifile=$(find $XGPATH_DB/$T/$N -iname "*.file" | head -n 1)
+
+	#echo "$ifile"
 
 	if [ "x$ifile" != "x" ]; then
 		#found
 		oldinst_atom=$(basename $ifile .file)
+		#echo "found, atom=$oldinst_atom"
 		return 1
 	else
 		#not found
@@ -982,7 +982,7 @@ gpkg_begin_install()
 
 	#parse input 
 	#echo "atom=$1"
-	atom_parse_type "$1"
+	atom_parse "$1"
 	iname=$N
 	iver=$V
 	irver=$R
@@ -1046,7 +1046,7 @@ gpkg_do_install()
 
 gpkg_do_checksum_package()
 {
-	local files=$(ls $XGPATH_DB/$1/$2/*.xgb)
+	local files=$(ls $XGPATH_DB/$1/$2/*.xgb 2>/dev/null)
 	local file
 	local count
 	local -a value
@@ -1157,6 +1157,105 @@ gpkg_do_build()
 #install packge. $1 is atom with type, such as "app-editors/vim-7.2.404"
 #or only name with version, such as "vim-7.2.404"
 #or only name, such as "vim"
+gpkg_install_dep()
+{
+	local newest
+	local ret
+	local iname
+	local iver
+	local irver
+	local nname
+	local nver
+	local nrver
+	local dep
+	local leading
+	local inst_atom
+	
+	#get xgb file
+	gpkg_getxgbfile $1
+	if [ "$?" == "0" ]; then
+
+		#check if installed.
+		atom_parse_path $newest
+		gpkg_checkInst
+		inst_atom=$oldinst_atom
+
+		echo "newest:    $newest"
+		echo "installed: $inst_atom"
+
+		#reset old values
+		atom_parse_path $newest
+		nname="$N"
+		nver="$V"
+		nrver="$R"
+
+		atom_parse $inst_atom
+		iname="$N"
+		iver="$V"
+		irver="$R"
+
+		#compare
+		atom_cmp "$iname-$iver$irver" "$nname-$nver$nrver"
+		echo "$?"
+		return 0
+
+
+
+		#check if in global set.
+
+		#not in global set, add it.
+
+		#found, include and print deps
+		#echo ">>> begin show $newest.."
+
+		#include file.
+		. $XGPATH_LIB/template.xgb
+		err_check "include xgb template file failed."
+
+		#call init
+		XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
+		. $XGPATH_SCRIPT/$N-$V$R.xgb
+		err_check "include xgb file failed."
+
+		xgb_init > /dev/null 2>&1
+		err_check "call xgb_init failed"
+
+		#show package
+		if [ -z "$inst_atom" ]; then
+			#not installed
+			showFailed "${2} ${1} (Not Installede)"
+		else
+			showinfo "${2} $inst_atom"
+		fi
+
+		#check if package installed.
+		#show all deps
+		#echo ">>> DEP = $DEPEND"
+
+		leading="${2}    "
+		for dep in $DEPEND
+		do
+			gpkg_showdep "$dep" "$leading"	
+			err_check "Error: DEP $dep Not found."
+		done
+		
+	else
+		#not found
+		return 1
+	fi
+
+
+	#check depdents
+
+	su -p gpkg -c "export PATH=$PATH; gpkg -buildraw $patom"
+
+	#no need root privilege to install package.
+	gpkg_begin_install "$patom"
+}
+
+#install packge. $1 is atom with type, such as "app-editors/vim-7.2.404"
+#or only name with version, such as "vim-7.2.404"
+#or only name, such as "vim"
 gpkg_install()
 {
 	local patom="$1"
@@ -1175,11 +1274,16 @@ gpkg_install()
 		err_check "create user gpkg failed."
 	fi
 
+	gpkg_install_dep "$patom"
+	return 0
+
 	su -p gpkg -c "export PATH=$PATH; gpkg -buildraw $patom"
 
 	#no need root privilege to install package.
 	gpkg_begin_install "$patom"
 }
+
+
 
 # $1 is package name, such as "glibc"
 gpkg_begin_edit()
@@ -1244,18 +1348,21 @@ gpkg_begin_new()
 	if [ "$?" == "0" ]; then
 		vim $newest
 	else
+		echo "NO $1 found."
 		atom_parse $1
-		itype=$N
+		itype=$T
 		iname=$N
 		iver=$V
 		irver=$R
 		echo n=$N	
 		gpkg_getxgbfile $N
-		if [ $? == 0 ]; then
+		if [ "$?" == "0" ]; then
 			#found
+			echo found $newest
 			cp $newest $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
 			vim $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
 		else
+			echo asdfasd
 			if [ "x$itype" == "x" ]; then
 				echo "No type found, should be 'new sys-libs/glibc-2.32'"
 				exit 3
@@ -1286,12 +1393,7 @@ gpkg_showdep()
 	local irver
 	local dep
 	local leading
-
-	#parse input 
-	atom_parse_type $1
-	iname=$N
-	iver=$V
-	irver=$R
+	local inst_atom
 
 	#get xgb file
 	gpkg_getxgbfile $1
@@ -1299,7 +1401,8 @@ gpkg_showdep()
 
 		#check if installed.
 		atom_parse_path $newest
-		gpkg_checkInst && echo "$N-$V$R already installed." && return 0
+		gpkg_checkInst
+		inst_atom=$oldinst_atom
 
 		#reset old values
 		atom_parse_path $newest
@@ -1324,7 +1427,12 @@ gpkg_showdep()
 		err_check "call xgb_init failed"
 
 		#show package
-		echo "${2} ${1}"
+		if [ -z "$inst_atom" ]; then
+			#not installed
+			showFailed "${2} ${1} (Not Installede)"
+		else
+			showinfo "${2} $inst_atom"
+		fi
 
 		#check if package installed.
 		#show all deps
@@ -1639,7 +1747,7 @@ gpkg_readfile()
 
 gpkg_list_inst_info()
 {
-	local files=$(ls $XGPATH_DB/$1/$2/*.xgb)
+	local files=$(ls $XGPATH_DB/$1/$2/*.xgb 2>/dev/null)
 	local file
 	local count
 	local -a value
@@ -1688,7 +1796,7 @@ gpkg_list_installed()
 
 gpkg_list_showallfile()
 {
-	local files=$(ls $XGPATH_DB/$1/$2/*.xgb)
+	local files=$(ls $XGPATH_DB/$1/$2/*.xgb 2>/dev/null)
 	local file
 	local count
 	local -a value
