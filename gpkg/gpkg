@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.35.2
+gpkg_version=0.10.35.3
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -589,7 +589,7 @@ gpkg_getxgbfile()
 	#echo result=$results, V=$V, R=$R
 	if [ "$count" == "0" ]; then
 		#not found
-		showFailed "Not found."
+		showFailed "$1 is not found."
 		return 2
 	fi
 
@@ -1240,9 +1240,10 @@ gpkg_install_dep()
 		#need install 
 		;;
 
-	"*")
+	*)
 		#error
-		return 4
+		exit 4
+		;;
 	esac
 
 	atom_parse_path $newest
@@ -1453,7 +1454,7 @@ gpkg_showdep()
 		cnt_install=$(($cnt_install+1))
 		;;
 
-	"*")
+	*)
 		#error
 		return 4
 	esac
