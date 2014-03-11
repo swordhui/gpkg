@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.34
+gpkg_version=0.10.35
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -1164,8 +1164,8 @@ gpkg_check_packge()
 			#installed. check version
 			inst_atom=$oldinst_atom
 
-			echo "newest:    $newest"
-			echo "installed: $inst_atom"
+			#echo "newest:    $newest"
+			#echo "installed: $inst_atom"
 
 			#reset old values
 			atom_parse_path $newest
@@ -1406,7 +1406,7 @@ gpkg_begin_new()
 }
 
 
-# $1 is package name, such as "glibc"
+# $1 is package name, such as "glibc", or "glibc-2.18"
 # $2 is leading charaters before package name
 gpkg_showdep()
 {
@@ -1419,60 +1419,69 @@ gpkg_showdep()
 	local leading
 	local inst_atom
 
-	#get xgb file
-	gpkg_getxgbfile $1
-	if [ $? == 0 ]; then
 
-		#check if installed.
+	#check if in global set.
+
+	gpkg_check_packge "$1"
+	case "$?" in
+	"0")
+		#no need update, return directly
 		atom_parse_path $newest
-		gpkg_checkInst
-		inst_atom=$oldinst_atom
+		echo "${2} $N-$V$R (Installed)"
+		#return 0;
+		;;
 
-		#reset old values
+	"1")
+		#need upgrade
 		atom_parse_path $newest
+		showFailed "${2} $oldinst_atom ==> (U)$N-$V$R"
+		cnt_install=$(($cnt_install+1))
+		;;
 
-		#check if in global set.
+	"2")
+		#need downgrade
+		atom_parse_path $newest
+		showFailed "${2} $oldinst_atom ==> (D)$N-$V$R"
+		cnt_install=$(($cnt_install+1))
+		;;
 
-		#not in global set, add it.
+	"3")
+		#new install 
+		atom_parse_path $newest
+		showFailed "${2} $1 ==> (N)$N-$V$R"
+		cnt_install=$(($cnt_install+1))
+		;;
 
-		#found, include and print deps
-		#echo ">>> begin show $newest.."
+	"*")
+		#error
+		return 4
+	esac
 
-		#include file.
-		. $XGPATH_LIB/template.xgb
-		err_check "include xgb template file failed."
 
-		#call init
-		XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
-		. $XGPATH_SCRIPT/$N-$V$R.xgb
-		err_check "include xgb file failed."
+	#not in global set, add it.
 
-		xgb_init > /dev/null 2>&1
-		err_check "call xgb_init failed"
+	#include file.
+	. $XGPATH_LIB/template.xgb
+	err_check "include xgb template file failed."
 
-		#show package
-		if [ -z "$inst_atom" ]; then
-			#not installed
-			showFailed "${2} ${1} (Not Installede)"
-		else
-			showinfo "${2} $inst_atom"
-		fi
+	#call init
+	XGPATH_SCRIPT=$XGPATH_LIB/$T/$N
+	. $XGPATH_SCRIPT/$N-$V$R.xgb
+	err_check "include xgb file failed."
 
-		#check if package installed.
-		#show all deps
-		#echo ">>> DEP = $DEPEND"
+	xgb_init > /dev/null 2>&1
+	err_check "call xgb_init failed"
 
-		leading="${2}    "
-		for dep in $DEPEND
-		do
-			gpkg_showdep "$dep" "$leading"	
-			err_check "Error: DEP $dep Not found."
-		done
-		
-	else
-		#not found
-		return 1
-	fi
+	#check if package installed.
+	#show all deps
+	#echo ">>> DEP = $DEPEND"
+
+	leading="${2}    "
+	for dep in $DEPEND
+	do
+		gpkg_showdep "$dep" "$leading"	
+		err_check "Error: DEP $dep Not found."
+	done
 }
 
 
@@ -2600,9 +2609,12 @@ stage[0-4])
 
 	#unset DEP,RDEP
 	unset GPKG_DEP_LIST
+	cnt_install="0"
 
 	#show dependant
 	gpkg_showdep $2 ""
+
+	showinfo "Packages need to be installed: $cnt_install"
 	;;
 
 -rdep)
