@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.36
+gpkg_version=0.10.36.1
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -1190,6 +1190,23 @@ gpkg_check_packge()
 
 }
 
+#install directly $1 is atom with type, such as "app-editors/vim-7.2.404"
+#or only name with version, such as "vim-7.2.404"
+#or only name, such as "vim"
+gpkg_install_directly()
+{
+	local patom="$1"
+
+	#check depdents
+	su -p gpkg -c "export PATH=$PATH; $0 -buildraw $patom"
+
+	#no need root privilege to install package.
+	gpkg_begin_install "$patom"
+
+	return 0
+}
+	
+
 #install packge. $1 is atom with type, such as "app-editors/vim-7.2.404"
 #or only name with version, such as "vim-7.2.404"
 #or only name, such as "vim"
@@ -1251,14 +1268,8 @@ gpkg_install_dep()
 	done
 
 
-		
-	
-	#check depdents
 	showinfo "install $T/$N-$V$R..."
-	su -p gpkg -c "export PATH=$PATH; $0 -buildraw $patom"
-
-	#no need root privilege to install package.
-	gpkg_begin_install "$patom"
+	gpkg_install_directly "$patom"
 }
 
 #install packge. $1 is atom with type, such as "app-editors/vim-7.2.404"
@@ -1282,7 +1293,11 @@ gpkg_install()
 		err_check "create user gpkg failed."
 	fi
 
-	gpkg_install_dep "$patom"
+	if [ "$pack_only" == "1" ]; then
+		gpkg_install_directly "$patom"
+	else
+		gpkg_install_dep "$patom"
+	fi
 	return 0
 }
 
