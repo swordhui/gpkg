@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.36.1
+gpkg_version=0.10.37
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -1866,7 +1866,7 @@ gpkg_list_package()
 	[ "$findcount" == "0" ] && showFailed "package $1 not found"
 }
 
-#remove packet, $1=type, $2=$N, $3=$V if have, $4=$R if have
+#remove packet, $1=type_db_path, $2=$N, $3=$V if have, $4=$R if have
 gpkg_do_remove_package()
 {
 	local file
@@ -1880,26 +1880,22 @@ gpkg_do_remove_package()
 
 	#echo "T=$1 N=$2 V=$3 R=$4"
 
-	XGPATH_SCRIPT=$XGPATH_DB/$1/$2
+	XGPATH_SCRIPT="$1/$2"
 	#echo scriptpath $XGPATH_SCRIPT
 	if [ -z "$3$4" ]; then
 		#no version specified
-		file=$(ls $XGPATH_DB/$1/$2/*.xgb 2>/dev/null | head -n 1 )
+		file=$(ls $XGPATH_SCRIPT/*.xgb 2>/dev/null | head -n 1 )
 	else
 		#version specified.
-		file=$XGPATH_DB/$1/$2/$2-$3$4.xgb
+		file=$XGPATH_SCRIPT/$2-$3$4.xgb
 	fi
 
-	if [ -z "$file" ]; then
-		return 1
-	fi
 
 	xgbfilen="$file"
-	file=$(basename $file .xgb)
-	atom_parse $file
-	T=$1
+	atom_parse_path $xgbfilen
+
 	
-	if [ -a "$xgbfilen" ]; then
+	if [ -f "$xgbfilen" ]; then
 		showinfo "remove $T/$N-$V$R..."
 	else
 		showFailed "$xgbfilen not found."
@@ -1975,7 +1971,7 @@ gpkg_remove_package()
 	[ "$findcount" -gt "1"  ] && showFailed "package $1 are too many. " && return 2
 
 	atom_parse_path $pack
-	gpkg_do_remove_package $T $N $V $R
+	gpkg_do_remove_package "$XGPATH_DB/$T" $N $V $R
 }
 
 gpkg_install_binary_package()
@@ -2068,9 +2064,9 @@ gpkg_upgrade_binary_package()
 	local xippath
 	local newv
 	local newr
+	local newt
 	local oldv
 	local oldr
-	local oldsrcfile
 	oldfile=""
 
 	dbpath=${XGPATH_DB_RAW#/}
@@ -2084,16 +2080,14 @@ gpkg_upgrade_binary_package()
 	#check xgb
 	[ -z "$xgbfile" ] && showFailed "Not xgp format" && exit 1
 
-	xgbfile=${xgbfile#$dbpath}
-	xgbfile=${xgbfile#/}
-	T=${xgbfile%%/*}
-	[ -z "$T" ] && showFailed "Not xgp format" && exit 1
+	#echo "xgb=$xgbfile"
+	atom_parse_path "$xgbfile"
 
-	atom=${xgbfile##*/}
-	atom_parse "$atom"
+	#echo "T=$T, N=$N, V=$V.."
 
 	newv=$V
 	newr=$R
+	newt=$T
 
 	showinfo ">> checking $T/$N.."
 	gpkg_checkInst
@@ -2104,16 +2098,19 @@ gpkg_upgrade_binary_package()
 	fi
 
 	atom_parse $oldinst_atom
-	if [ "$V$R" == "$newv$newr" ]; then
-		showOK "$N-$V$R already installed."
-		return 0
-	fi
 
-	showinfo ">> upgrade $N-$V$R to $N-$newv$newr ..."
+	#install forcely
+
+	#if [ "$V$R" == "$newv$newr" ]; then
+	#	showOK "$N-$V$R already installed, replace only"
+	#fi
+
+	showinfo ">> update $N-$V$R to $N-$newv$newr ..."
 	oldv=$V
 	oldr=$R
 	V=$newv
 	R=$newr
+	T=$newt
 
 	#check XG_DB_RAW
 	if [ "$XGPATH_DB_RAW" != "/var/xiange/db" ]; then
@@ -2121,17 +2118,26 @@ gpkg_upgrade_binary_package()
 		exit 2
 	fi
 	#get .file from packet
-	xibpath=/tmp/$UID/xiange/xib
-	mkdir -p $xibpath
+	xibpath=/tmp/$UID/$N-$V$R
+	rm -rf $xibpath
+	mkdir -p ${xibpath}/bak/$T
 	err_check "[Error] make tmp $xibpath failed.\n"
 
 	#old .file
-	oldfile=$xibpath/$N-$oldv$oldr.file
-	oldsrcfile=$XGPATH_DB/$T/$N/$N-$oldv$oldr.file
-	cp $oldsrcfile  $oldfile
-	err_check "copy $XGPATH_DB/$T/$N/$N-$oldv$oldr.file failed."
-
-
+	if [ -f $XGPATH_DB/$T/$N/$N-$oldv$oldr.file ]; then
+		mv $XGPATH_DB/$T/$N ${xibpath}/bak/$T
+		err_check "copy $XGPATH_DB/$T/$N failed."
+	else
+		showFailed "$XGPATH_DB/$T/$N/$N-$oldv$oldr.file is not found."
+		exit 1
+	fi
+	oldfile=$xibpath/bak/$T/$N/$N-$oldv$oldr.file
+	if [ -f $oldfile ]; then
+		echo file copy OK
+	else
+		showFailed "$oldfile is not found."
+		exit 2
+	fi
 
 	infofile="var/xiange/db/$T/$N/$N-$V$R.file"
 	tar xf "$packname" -C $xibpath "$infofile" 
@@ -2142,11 +2148,11 @@ gpkg_upgrade_binary_package()
 	#check all files
 	gpkg_readfile "$infofile" "u"
 
-	#copy changed old file
-	cp $oldfile $oldsrcfile
-	err_check "change $oldsrcfile failed."
-	popd
+	popd 2>/dev/null
 	rm -rf $infofile
+
+	#renamve oldname
+	newname="$N_bak"
 
 	showinfo ">> installing $T/$N-$V$R ..."
 
@@ -2156,9 +2162,8 @@ gpkg_upgrade_binary_package()
 	err_check "[Error] copy binary package to / failed"
 	showinfo ">> Install OK, cleaning up.."
 
-
 	#remove old files
-	gpkg_do_remove_package "$T" "$N" "$oldv" "$oldr"
+	gpkg_do_remove_package "$xibpath/bak/$T" "$N" "$oldv" "$oldr"
 
 	V=$newv
 	R=$newr
