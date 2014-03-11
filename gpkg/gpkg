@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.35.3
+gpkg_version=0.10.36
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -1011,8 +1011,8 @@ gpkg_do_install()
 	err_check "[Error] make binary package failed"
 
 	if [ "$pack_only" == "0" ]; then
-		#copy to root
-		gpkg_install_binary_package $XGPATH_PACKAGE/$N-$V$R.xgp
+		#copy to root(upgrade)
+		gpkg_upgrade_binary_package $XGPATH_PACKAGE/$N-$V$R.xgp
 	else
 		showinfo ">> $XGPATH_PACKAGE/$N-$V$R.xgp is ready."
 	fi
@@ -1097,30 +1097,13 @@ gpkg_do_build()
 	#get xgb file
 	gpkg_getxgbfile $1
 	if [ $? == 0 ]; then
-
 		#check if installed.
 		atom_parse_path $newest
-
-		newv=$V
-		newr=$R
-
-		if [ "$pack_only" == "0" ]; then
-			showinfo ">> checking $T/$N.."
-			gpkg_checkInst
-			if [ "$?" == "1" ]; then
-				atom_parse $oldinst_atom
-				showOK ">> found $N-$V$R. please run gpkg -u to upgrade to $N-$newv$newr."
-				return 0
-			fi
-		fi
-
-		V=$newv
-		R=$newr
-
+	
 		#found, download it
 		gpkg_begin_download $newest
 		ret=$?
-		if [ $? == 0 ]; then
+		if [ "$ret" == "0" ]; then
 			#download ok, install it.
 			gpkg_beginbuild $newest
 		else
@@ -1272,8 +1255,7 @@ gpkg_install_dep()
 	
 	#check depdents
 	showinfo "install $T/$N-$V$R..."
-
-	su -p gpkg -c "export PATH=$PATH; gpkg -buildraw $patom"
+	su -p gpkg -c "export PATH=$PATH; $0 -buildraw $patom"
 
 	#no need root privilege to install package.
 	gpkg_begin_install "$patom"
@@ -1302,11 +1284,6 @@ gpkg_install()
 
 	gpkg_install_dep "$patom"
 	return 0
-
-	su -p gpkg -c "export PATH=$PATH; gpkg -buildraw $patom"
-
-	#no need root privilege to install package.
-	gpkg_begin_install "$patom"
 }
 
 
