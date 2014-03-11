@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.38
+gpkg_version=0.10.38.1
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -1735,51 +1735,40 @@ gpkg_readfile()
 
 gpkg_list_inst_info()
 {
-	local files=$(ls $XGPATH_DB/$1/$2/*.xgb 2>/dev/null)
-	local file
-	local count
 	local -a value
 	local t1
 	local t2
 	local tsize
 
-	for file in $files
-	do
-		file=${file##*/}
-		atom_parse $file
+	atom_parse_path "$1"
 
-		#get date.
-		csv_split `cat $XGPATH_DB/$1/$2/$N-$V$R.date`
-		t1=${value[0]}
-		t2=${value[1]}
+	#get date.
+	csv_split `cat $XGPATH_DB/$T/$N/$N-$V$R.date`
+	t1=${value[0]}
+	t2=${value[1]}
 
-		#get size, 
-		csv_split `tail -n 1 $XGPATH_DB/$1/$2/$N-$V$R.file`
-		tsize=${value[5]}
+	#get size, 
+	csv_split `tail -n 1 $XGPATH_DB/$T/$N/$N-$V$R.file`
+	tsize=${value[5]}
 
-		printf "$NORMAL%s %s $INFO%6sK $FAILURE%s\n" $t1 $t2 $tsize $N-$V$R
-	done
-	
+	printf "$NORMAL%s %s $INFO%6sK $FAILURE%s\n" $t1 $t2 $tsize $N-$V$R
 }
 
 gpkg_list_installed()
 {
-	local gpkg_types
-	local type
 	local gpkg_packs
 	local pack
 	local count=0
 
-	gpkg_types=`ls $XGPATH_DB 2>/dev/null`
-	for type in $gpkg_types
-	do
-		gpkg_packs=`ls $XGPATH_DB/$type 2>/dev/null`
-		for pack in $gpkg_packs
-		do
-			gpkg_list_inst_info $type $pack	
-		done
-	done
 
+	gpkg_packs=`find -L $XGPATH_DB -iname *.xgb 2>/dev/null`
+	
+	for pack in $gpkg_packs
+	do
+		#echo $pack
+		count=$(($count+1))
+		gpkg_list_inst_info "$pack"
+	done
 }
 
 #list, $1 is xgb path name
