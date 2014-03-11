@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.35
+gpkg_version=0.10.35.2
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -467,9 +467,9 @@ gpkg_search()
 
 	#type?
 	if [ -n "$T" ]; then
-		results=$(find -L $XGPATH_LIB -iname "$iname" | grep "/$T/")
+		results=$(find -L $XGPATH_LIB -iname "$iname" 2>/dev/null | grep "/$T/")
 	else
-		results=$(find -L $XGPATH_LIB -iname "$iname")
+		results=$(find -L $XGPATH_LIB -iname "$iname" 2>/dev/null)
 	fi
 
 	for pack in $results
@@ -574,9 +574,9 @@ gpkg_getxgbfile()
 
 	#type?
 	if [ -n "$T" ]; then
-		results=$(find -L $XGPATH_LIB -iname "$iname" | grep "/$T/")
+		results=$(find -L $XGPATH_LIB -iname "$iname" 2>/dev/null | grep "/$T/")
 	else
-		results=$(find -L $XGPATH_LIB -iname "$iname")
+		results=$(find -L $XGPATH_LIB -iname "$iname" 2>/dev/null)
 	fi
 
 	for pack in $results
@@ -603,6 +603,7 @@ gpkg_getxgbfile()
 
 	#more results, get the newest one
 	gpkg_getnewest
+	return 0
 }
 
 #begin download, $1 is atom with path,  such as 
@@ -774,7 +775,7 @@ gpkg_dopack()
 
 	#generate file list
 	cd $XGPATH_DEST
-	find | xgfileinfo > /tmp/file-$N-$V$R
+	find 2>/dev/null | xgfileinfo > /tmp/file-$N-$V$R
 	err_check "call xgfileinfo failed."
 
 	mkdir -p $destpath
@@ -886,7 +887,7 @@ gpkg_checkInst()
 
 	#echo "T=$T, N=$N"
 
-	ifile=$(find $XGPATH_DB/$T/$N -iname "*.file" | head -n 1)
+	ifile=$(find $XGPATH_DB/$T/$N -iname "*.file" 2>/dev/null | head -n 1)
 
 	#echo "$ifile"
 
@@ -1969,7 +1970,7 @@ gpkg_remove_package()
 	fi
 
 	#echo "N=$rmN, V=$rmV, R=$rmR"
-	gpkg_packs=`find -L $XGPATH_DB -iname $fname`
+	gpkg_packs=`find -L $XGPATH_DB -iname $fname 2>/dev/null`
 	for pack in $gpkg_packs
 	do
 		echo $pack
@@ -2207,7 +2208,7 @@ gpkg_search_belonging()
 	local -a value
 
 
-	packags=$(grep ",$1," `find -L $XGPATH_DB -iname "*.file"`)
+	packags=$(grep ",$1," `find -L $XGPATH_DB -iname "*.file" 2>/dev/null`)
 	for i in $packags
 	do
 		((outcnt++))
@@ -2276,7 +2277,7 @@ gpkg_check_orphan()
 gpkg_find_orphans()
 {
 	echo "Searching orphans in $1.."
-	find "$1" -type f | gpkg_check_orphan
+	find "$1" -type f 2>/dev/null | gpkg_check_orphan
 }
 
 #$1 is file
@@ -2286,7 +2287,7 @@ gpkg_check_rdep()
 	local name
 	local value
 
-	packags=$(grep ",$1," `find -L $XGPATH_DB -iname "*.file"`)
+	packags=$(grep ",$1," `find -L $XGPATH_DB -iname "*.file" 2>/dev/null`)
 	for i in $packags
 	do
 
