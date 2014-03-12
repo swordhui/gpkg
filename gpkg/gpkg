@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.39.1
+gpkg_version=0.10.39.2
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -1328,11 +1328,13 @@ gpkg_begin_new()
 				echo "No version found, should be 'new sys-libs/glibc-2.32'"
 				exit 4
 			fi
+			T=$itype
+			N=$iname
+			V=$iver
+			R=$irver
 			mkdir -p $XGPATH_LIB/$T/$N
 			cp $XGPATH_LIB/template.xgb $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
 			vim $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
-			#echo $XGPATH_LIB/template.xgb 
-			#echo $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
 		fi
 		
 	fi
