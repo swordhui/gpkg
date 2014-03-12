@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.38.1
+gpkg_version=0.10.39
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -1531,8 +1531,8 @@ gpkg_csvop_check_file()
 	F)
 		#file
 		if [ -f "$cname" ]; then
-			showFailed "FAIL (F) $cname exists, please unload installed package."
-			exit 5
+			gpkg_add_conflict "$cname"
+			showFailed "FAIL (F) $cname exists"
 		else
 			echo  "OK   (F) $cname"
 		fi
@@ -1540,6 +1540,7 @@ gpkg_csvop_check_file()
 	D)
 		#file
 		if [ -f "$cname" ]; then
+			gpkg_add_conflict "$cname"
 			showFailed "FAIL (D) $cname is a file, please check."
 		else
 			echo  "OK   (D) $cname"
@@ -1594,8 +1595,8 @@ gpkg_csvop_update_file()
 		else
 			#not found in old packge
 			if [ -f "$cname" ]; then
-				showFailed "FAIL (NF) $cname exists, please unload installed package."
-				exit 5
+				showFailed "FAIL (NF) $cname exists"
+				gpkg_add_conflict "$cname"
 			else
 				showinfo  "OK   (NF) $cname"
 			fi
@@ -1612,7 +1613,8 @@ gpkg_csvop_update_file()
 		else
 			#new directory
 			if [ -f "$cname" ]; then
-				showFailed "FAIL (ND) $cname is a file, please check."
+				showFailed "FAIL (ND) $cname is a file"
+				gpkg_add_conflict "$cname"
 			else
 				showinfo  "OK   (ND) $cname"
 			fi
@@ -1630,7 +1632,8 @@ gpkg_csvop_update_file()
 		else
 			#new directory
 			if [ -a "$cname" ]; then
-				showFailed "FAIL (ND) $cname exists, please check."
+				gpkg_add_conflict "$cname"
+				showFailed "FAIL (ND) $cname exists"
 			else
 				showinfo  "OK   (N$ftype) $cname"
 			fi
@@ -1915,6 +1918,46 @@ gpkg_remove_package()
 	gpkg_do_remove_package "$XGPATH_DB/$T" $N $V $R
 }
 
+#record confilict files, $1 is file name.
+gpkg_add_conflict()
+{
+	cnt_conflic=$(($cnt_conflic+1))
+	echo "$1" >> $file_conflict
+}
+
+#copy conflict file to /var/xiange/db/conflicts
+#$1 is conflict file
+gpkg_keep_conflict()
+{
+	local fconflict="$1"
+
+	if [ -f $fconflict ]; then
+		mkdir -p $XGPATH_DB/conflicts
+		cp $fconflict $XGPATH_DB/conflicts
+	fi
+}
+
+gpkg_wait_10sec()
+{
+	local i
+
+	if [ "$cnt_conflic" == "0" ]; then
+		return 0
+	fi
+
+	showFailed "$cnt_conflic conflict file found, Ctrl+C to abort, or 10 seconds to ignore"
+	for ((i=10; i>0; i--))
+	{
+		printf "%d " $i
+		sleep 1
+	}
+
+	printf "\ncontinue.\n"
+
+}
+
+
+
 gpkg_install_binary_package()
 {
 	local xgbfile
@@ -1946,20 +1989,24 @@ gpkg_install_binary_package()
 		exit 2
 	fi
 	#get .file from packet
-	xibpath=/tmp/$UID/xiange/xib
-	mkdir -p $xibpath
+	xibpath=/tmp/$UID/$N-$V$R
+	rm -rf $xibpath
+	mkdir -p ${xibpath}/bak/$T
 	err_check "[Error] make tmp $xibpath failed.\n"
 
 	infofile="var/xiange/db/$T/$N/$N-$V$R.file"
+	file_conflict="$xibpath/$N-$V$R.conflict"
 	tar xf "$packname" -C $xibpath "$infofile" 
 	err_check "[Error] get file info from pack failed."
 
 	pushd $xibpath > /dev/null
 
 	#check all files
+	cnt_conflic="0"
 	gpkg_readfile "$infofile" "c"
 	popd
 	rm -rf $infofile
+	gpkg_wait_10sec
 
 	showinfo ">> installing $T/$N-$V$R ..."
 
@@ -1967,6 +2014,10 @@ gpkg_install_binary_package()
 	showinfo ">> Moving files to $XGROOT/ ..."
 	tar xjpf "$1" --keep-directory-symlink -C $XGROOT/ 
 	err_check "[Error] copy binary package to / failed"
+
+	gpkg_keep_conflict "$file_conflict"
+
+
 	showinfo ">> Install OK, cleaning up.."
 
 	#clear all routines by include template file
@@ -2081,16 +2132,19 @@ gpkg_upgrade_binary_package()
 	fi
 
 	infofile="var/xiange/db/$T/$N/$N-$V$R.file"
+	file_conflict="$xibpath/$N-$V$R.conflict"
 	tar xf "$packname" -C $xibpath "$infofile" 
 	err_check "[Error] get file info from pack failed."
 
 	pushd $xibpath > /dev/null
 
 	#check all files
+	cnt_conflic="0"
 	gpkg_readfile "$infofile" "u"
 
 	popd 2>/dev/null
 	rm -rf $infofile
+	gpkg_wait_10sec
 
 	#renamve oldname
 	newname="$N_bak"
@@ -2102,6 +2156,8 @@ gpkg_upgrade_binary_package()
 	tar xjpf "$1" --keep-directory-symlink -C $XGROOT/ 
 	err_check "[Error] copy binary package to / failed"
 	showinfo ">> Install OK, cleaning up.."
+
+	gpkg_keep_conflict "$file_conflict"
 
 	#remove old files
 	gpkg_do_remove_package "$xibpath/bak/$T" "$N" "$oldv" "$oldr"
