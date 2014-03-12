@@ -1946,6 +1946,7 @@ gpkg_wait_10sec()
 	fi
 
 	showFailed "$cnt_conflic conflict file found, Ctrl+C to abort, or 10 seconds to ignore"
+	cat "$file_conflict" | nl
 	for ((i=10; i>0; i--))
 	{
 		printf "%d " $i
