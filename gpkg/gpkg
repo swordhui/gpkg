@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.39
+gpkg_version=0.10.39.1
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -1262,26 +1262,6 @@ gpkg_install()
 	return 0
 }
 
-
-
-# $1 is package name, such as "glibc"
-gpkg_begin_edit()
-{
-	local newest
-	local ret
-	local iname
-	local iver
-	local irver
-	local dep
-	local leading
-
-	#get xgb file
-	gpkg_getxgbfile $1
-	if [ $? == 0 ]; then
-		vim $newest
-	fi
-}
-
 gpkg_begin_rmxgb()
 {
 	local newest
@@ -1296,7 +1276,7 @@ gpkg_begin_rmxgb()
 
 	#get xgb file
 	gpkg_getxgbfile $1
-	if [ $? == 0 ]; then
+	if [ "$?" == "0" ]; then
 		echo "delete $newest? (y/n)"
 		read dep
 
@@ -1333,15 +1313,13 @@ gpkg_begin_new()
 		iname=$N
 		iver=$V
 		irver=$R
-		echo n=$N	
 		gpkg_getxgbfile $N
 		if [ "$?" == "0" ]; then
 			#found
-			echo found $newest
+			atom_parse_path "$newest"
 			cp $newest $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
 			vim $XGPATH_LIB/$T/$N/$N-$iver$irver.xgb
 		else
-			echo asdfasd
 			if [ "x$itype" == "x" ]; then
 				echo "No type found, should be 'new sys-libs/glibc-2.32'"
 				exit 3
@@ -2662,7 +2640,7 @@ stage[0-4])
 	;;
 
 edit)
-	gpkg_begin_edit "$2"
+	gpkg_begin_new "$2"
 	;;
 
 new)
