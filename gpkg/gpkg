@@ -55,7 +55,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.39.2
+gpkg_version=0.10.40.1
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -562,7 +562,7 @@ gpkg_getxgbfile()
 		echo -e "\tgpkg -i vim"
 		echo -e "\tgpkg -i vim-7.2.404"
 		echo -e "\tgpkg -i app-editors/vim-7.2.404"
-		return 1
+		exit 1
 	fi
 
 	if [ "x$V" == "x" ]; then
@@ -1160,6 +1160,7 @@ gpkg_install_directly()
 
 	#check depdents
 	su -p gpkg -c "export PATH=$PATH; $0 -buildraw $patom"
+	err_check "make failed, exit."
 
 	#no need root privilege to install package.
 	gpkg_begin_install "$patom"
@@ -1260,6 +1261,13 @@ gpkg_install()
 		gpkg_install_dep "$patom"
 	fi
 	return 0
+}
+
+gpkg_make_pack_only()
+{
+	pack_only="1"
+	export pack_only=$pack_only
+	gpkg_install "$1"
 }
 
 gpkg_begin_rmxgb()
@@ -1699,8 +1707,33 @@ gpkg_do_stage1()
 	do
 		[ -z "$line" ] && continue
 		((count++))
-		echo -e "\n*** $count/$1 *** installing $line..\n"
-		gpkg -i $line
+		showinfo "\n*** $count/$1 *** installing $line..\n"
+
+		#check version
+		gpkg_getxgbfile "$line"
+		err_check "no .xgb file for $line."
+		
+		atom_parse_path "$newest"
+
+		#check if binary package exist
+
+		if [ -f "$XGPATH_PACKAGE/list/$T-$N-$V$R.mark" ]; then
+			#exits
+			showOK "$line has been already installed"
+			continue
+		fi
+
+		#build package
+		gpkg_make_pack_only "$T/$N-$V$R"
+
+		#install binary package
+		gpkg_upgrade_binary_package "$XGPATH_PACKAGE/$N-$V$R.xgp"
+
+
+		mkdir -p $XGPATH_PACKAGE/list
+		touch "$XGPATH_PACKAGE/list/$T-$N-$V$R.mark"
+
+
 		[ "$?" != "0" ] && break
 	done
 }
@@ -1857,7 +1890,7 @@ gpkg_find_insalled_pkg()
 		echo -e "\tgpkg -i vim"
 		echo -e "\tgpkg -i vim-7.2.404"
 		echo -e "\tgpkg -i app-editors/vim-7.2.404"
-		return 1
+		exit 1
 	fi
 
 
@@ -2392,9 +2425,7 @@ case "${1}" in
 	;;
 
 -ip)
-	pack_only="1"
-	export pack_only=$pack_only
-	gpkg_install "$2"
+	gpkg_make_pack_only "$2"
 	;;
 
 -buildraw)
