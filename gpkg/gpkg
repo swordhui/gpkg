@@ -28,6 +28,8 @@ CXXFLAGS="$CFLAGS"
 XGINST_PREFIX="--prefix=/usr"
 XGB_CONFIG="$XGINST_PREFIX "
 XG_I18N="en zh_CN"
+XGPARA_MAKE="-j `nproc`"
+
 
 #GIT server
 XG_GITSVR="git://github.com/swordhui/xglibs.git"
@@ -55,7 +57,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.40.2
+gpkg_version=0.10.41
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -680,8 +682,8 @@ gpkg_rm_dir_safe()
 	files=$(ls "$1" 2>/dev/null)
 	if [ -z "$files" ]; then
 		printf "Remove dir %s\n"  "$1"
-		rm -rf "$1"
 	fi
+	rm -d "$1" 2>/dev/null
 }
 
 #strip unnessesary i18n in path $1
@@ -1229,6 +1231,9 @@ gpkg_install_dep()
 		err_check "Error: install $dep failed."
 	done
 
+	#remove old build 
+	XGPATH_BUILD=/tmp/xiange/$N-$V$R
+	rm -rf $XGPATH_BUILD
 
 	showinfo "install $T/$N-$V$R..."
 	gpkg_install_directly "$patom"
@@ -2412,6 +2417,7 @@ case "${1}" in
 	echo 'CXXFLAGS="$CFLAGS"'
 	echo "XG_I18N=\"$XG_I18N\""
 	echo "XGB_CONFIG=\"$XGB_CONFIG\""
+	echo "XGPARA_MAKE=\"$XGPARA_MAKE\""
 	;;
 
 -s)
