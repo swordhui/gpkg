@@ -57,7 +57,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.41
+gpkg_version=0.10.41.1
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -682,8 +682,8 @@ gpkg_rm_dir_safe()
 	files=$(ls "$1" 2>/dev/null)
 	if [ -z "$files" ]; then
 		printf "Remove dir %s\n"  "$1"
+		rm -d "$1" 2>/dev/null
 	fi
-	rm -d "$1" 2>/dev/null
 }
 
 #strip unnessesary i18n in path $1
@@ -2401,6 +2401,9 @@ gpkg_rdep()
 #
 # parse parameters
 #
+
+#/tmp to remove getcwd problems.
+cd /tmp
 
 #reload parameters if available
 [ -f $XGROOT/etc/xgparas ] && . $XGROOT/etc/xgparas
