@@ -57,7 +57,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.41.1
+gpkg_version=0.10.41.2
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -78,7 +78,7 @@ gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-unchroot path	$NORMAL\tun-chroot\n
 	$INFO\t-rdep package	$NORMAL\tshow reverse dependence\n
 	$INFO\t-pack dir name version 	$NORMAL\tpack all files in dir to xgb file.\n
-	$INFO\t-packraw package $NORMAL\tinstall compiled package. need set install_path to path of build directory.\n
+	$INFO\t-packraw package $NORMAL\tcontinue install compiled package.\n
 	$INFO\tedit package	$NORMAL\tedit xgb file with vim\n
 	$INFO\tnew type/package-version	$NORMAL\tnew xgb file with vim\n
 	$INFO\trm package-version	$NORMAL\tremove xgb file with vim\n
@@ -935,6 +935,9 @@ gpkg_beginbuild()
 		exit 1
 	fi
 
+	#stort current path
+	pwd > $XGPATH_BUILD/install_path
+
 	#call build
 	xgb_build
 	err_check "[Error] call xgb_build failed"
@@ -945,11 +948,6 @@ gpkg_beginbuild()
 	mkfifo $XGPATH_BUILD/$N-$V$R.pipe2
 	tee $XGPATH_BUILD/$N-$V$R.test < $XGPATH_BUILD/$N-$V$R.pipe2 & 
 	xgb_check > $XGPATH_BUILD/$N-$V$R.pipe2
-
-	#stort current path
-
-	pwd > $XGPATH_BUILD/install_path
-
 }
 
 gpkg_begin_install()
@@ -992,6 +990,7 @@ gpkg_begin_install()
 	XGPATH_BUILD=/tmp/xiange/$N-$V$R
 	XGPATH_DEST=$XGPATH_BUILD/pack
 
+	#echo "$XGPATH_BUILD"
 	buildpath=$(cat $XGPATH_BUILD/install_path 2>/dev/null)
 	err_check ">> compile not completed."
 	echo "installing in $buildpath"
