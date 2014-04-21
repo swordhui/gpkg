@@ -15,7 +15,7 @@ XGPATH_SOURCE=$XGPATH/sources
 XGPATH_PACKAGE=$XGPATH/packages
 XGPATH_DB=$XGPATH/db
 XGPATH_DB_RAW=$XGPATH_RAW/db
-XGPATH_SdbCRIPT=$XGPATH_LIB
+XGPATH_SCRIPT=$XGPATH_LIB
 
 XGPATH_BUILD=/tmp/xiange
 XGPATH_DEST=
@@ -57,7 +57,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.41.2
+gpkg_version=0.10.42
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -1244,6 +1244,10 @@ gpkg_install_dep()
 gpkg_install()
 {
 	local patom="$1"
+
+	#/tmp to remove getcwd problems.
+	cd /tmp
+
 	#check if you're root
 	if [ "$UID" != "0" ]; then
 		showFailed "Installation need root privilege"
@@ -1313,6 +1317,13 @@ gpkg_begin_new()
 	local irver
 	local dep
 	local leading
+
+	case "${1}" in
+	stage[0-4])
+		vim $XGPATH_LIB/stages/$1
+		exit 0
+		;;
+	esac
 
 	if [ "$1" == "stage1" ]; then
 		vim $XGPATH_LIB/stages/$1
@@ -1748,6 +1759,87 @@ gpkg_do_stage1()
 
 
 		[ "$?" != "0" ] && break
+	done
+}
+
+gpkg_do_inst_stage()
+{
+	local line
+	local count
+
+	while IFS= read -r line
+	do
+		[ -z "$line" ] && continue
+		((count++))
+		showinfo "\n*** $count/$1 *** installing $line..\n"
+
+		#check version
+		gpkg_getxgbfile "$line"
+		err_check "no .xgb file for $line."
+		
+		atom_parse_path "$newest"
+
+		#check if binary package exist
+
+		if [ -f "$XGPATH_PACKAGE/list/$T-$N-$V$R.mark" ]; then
+			#exits
+			showOK "$line has been already installed"
+			continue
+		fi
+
+		#install binary package
+		gpkg_upgrade_binary_package "$XGPATH_OLDPACKS/$N-$V$R.xgp"
+
+
+		mkdir -p $XGPATH_PACKAGE/list
+		touch "$XGPATH_PACKAGE/list/$T-$N-$V$R.mark"
+
+
+		[ "$?" != "0" ] && break
+	done
+}
+
+#read from file, and do it one by one
+#$1 is total count.
+gpkg_do_ck_stage1()
+{
+	local line
+	local count="0"
+	local bdcount="0"
+	local badnames=""
+
+	echo "checking $1 packages form $XGPATH_OLDPACKS ..."
+
+	while IFS= read -r line
+	do
+		[ -z "$line" ] && continue
+		((count++))
+		#showinfo "\n*** $count/$1 *** checking $line..\n"
+
+		#check version
+		gpkg_getxgbfile "$line"
+		err_check "no .xgb file for $line."
+		
+		atom_parse_path "$newest"
+
+		#check if binary package exist
+
+		if [ -f "$XGPATH_OLDPACKS/$N-$V$R.xgp" ]; then
+			#exits
+			showOK "$count $N-$V$R is OK"
+			continue
+		else
+			#bad, record name
+			showFailed "$count $N-$V$R is failed"
+			badnames+=" $N-$V$R "
+			((bdcount++))
+		fi
+	done
+
+	echo "$count checked, $bdcount failed"
+	for i in $badnames ; 
+	do
+		echo $i
 	done
 }
 
@@ -2401,8 +2493,6 @@ gpkg_rdep()
 # parse parameters
 #
 
-#/tmp to remove getcwd problems.
-cd /tmp
 
 #reload parameters if available
 [ -f $XGROOT/etc/xgparas ] && . $XGROOT/etc/xgparas
@@ -2514,10 +2604,47 @@ selftest)
 	;;
 
 stage[0-4])
+	#compile stage
 	#read from list, and install it one by one.
 	lines=$(wc -l $XGPATH_LIB/stages/$1)
 	gpkg_do_stage1 $lines  < $XGPATH_LIB/stages/$1
 	;;
+
+ckstage)
+	#check stage
+	if [ -z "$2" ]; then
+		showFailed "Please specify stage number, such as gpkg inst stage 0 /var/xiange/packags"
+		exit 1
+	fi
+	if [ -z "$3" ]; then
+		showFailed "Please specify compiled package directory , such as gpkg ckstage 0 /var/xiange/packags"
+		exit 2
+	fi
+
+	#read from list, and install it one by one.
+	lines=$(wc -l $XGPATH_LIB/stages/stage$2)
+	XGPATH_OLDPACKS="$3"
+	gpkg_do_ck_stage1 $lines  < $XGPATH_LIB/stages/stage$2
+	;;
+
+inststage)
+	#install stage 
+	if [ -z "$2" ]; then
+		showFailed "Please specify stage number, such as gpkg inst stage 0 /var/xiange/packags"
+		return 1
+	fi
+	if [ -z "$3" ]; then
+		showFailed "Please specify compiled package directory , such as gpkg inst stage 0 /var/xiange/packags"
+		return 2
+	fi
+
+	#read from list, and install it one by one.
+	lines=$(wc -l $XGPATH_LIB/stages/stage$2)
+	XGPATH_OLDPACKS="$3"
+	gpkg_do_inst_stage $lines  < $XGPATH_LIB/stages/stage$2
+	;;
+
+
 
 -chroot)
 	#chroot to new system.

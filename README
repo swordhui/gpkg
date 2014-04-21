@@ -19,7 +19,26 @@ Dependence:
 	grep
 	git
 
+How to use:
+	1. make sure you have user gpkg and group gpkg. when in download/uncompress/config/build/test stage, it use gpkg:gpkg, not root.
+
+	 groupadd gpkg
+	 useradd -c "gpkg building" -d /dev/null -g gpkg -s /bin/false gpkg 
+
+
+	2. make sure you have directory /var/xiange/sources and /var/xiange/packages 
+	install -d -o gpkg -g gpkg -m 0664 /var/xiange/sources
+
+	3. run "gpkg --sync" to sync building scripts.
+
+	
+
+
+
 History:
+	0.10.42	2014-04-21
+		add gpkg ckstage, gpkg inststage for installing xiange system via binary packages.
+		fixed directory bugs
 
 	0.10.41 2014-03-18
 		add XGPARA_MAKE for parallel compiling.
