@@ -57,7 +57,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.42
+gpkg_version=0.10.43
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -114,6 +114,45 @@ xgb_prerm()
 xgb_postrm()
 {
 	echo "on dummy xgb_postrm"
+}
+
+xgb_mkmenu()
+{
+	local i
+
+	#conver icon if needed
+	if [ -n "$imgconv1" ]; then
+		mkdir -p $(dirname $XGPATH_DEST$imgconv2)
+		err_check "imgconv: mkdir 1 failed."
+
+		convert $convpara $XGPATH_DEST$imgconv1 -resize 32x32 $XGPATH_DEST$imgconv2
+		err_check "imgconv: conver failed."
+	fi
+
+	#destfile
+	mkdir -p $(dirname $menufile)
+	err_check "mkmenu: mkdir failed."
+
+	touch $menufile
+	err_check "mkmenu: touch failed."
+
+	#write all names
+	for i in ${!Name[@]};
+	do
+		echo "Name[$i]=\"${Name[$i]}\"" >> $menufile
+	done
+
+	echo "Icon=\"$imgconv2\"" >> $menufile
+	echo "Exec=\"$menu_cmd\"" >> $menufile
+	err_check "mkmenu: write failed."
+
+	return 0
+}
+
+xgb_update_last()
+{
+	mkdir -p $XGPATH_DB/info
+	touch $XGPATH_DB/info/last
 }
 
 #
@@ -1969,11 +2008,13 @@ gpkg_do_remove_package()
 	gpkg_reverse_remove
 
 	xgb_postrm
-	err_check "call xgb_postinst failed"
+	err_check "call xgb_postrm failed"
 
 	#remove infos.
 	gpkg_rm_packgeinfo
 
+	#update last change time
+	xgb_update_last
 
 	showOK "[***] $N-$V$R removed."
 
@@ -2162,6 +2203,9 @@ gpkg_install_binary_package()
 	xgb_postinst
 	err_check "[Error] call xgb_postinst failed"
 
+	#record last update time
+	xgb_update_last
+
 	showOK "[***] Binary package $N-$V$R installed to you system."
 }
 
@@ -2284,7 +2328,7 @@ gpkg_upgrade_binary_package()
 	V=$newv
 	R=$newr
 
-	#clear all routines by include template file
+	#clear all routines via template file
 	if [ -f $XGPATH_LIB/template.xgb ]; then
 		. $XGPATH_LIB/template.xgb
 		err_check "[Error] $XGPATH_LIB/template.xgb not found."
@@ -2306,6 +2350,9 @@ gpkg_upgrade_binary_package()
 	#post install
 	xgb_postinst
 	err_check "[Error] call xgb_postinst failed"
+
+	#record last update time
+	xgb_update_last
 
 	showOK "[***] Binary package $N-$V$R installed to you system."
 }
