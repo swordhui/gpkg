@@ -57,7 +57,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.43
+gpkg_version=0.10.44
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -2537,6 +2537,19 @@ gpkg_rdep()
 }
 
 #
+# get max tmpfs size, in bytes
+#
+xg_gettmpsize()
+{
+	local memsize
+	local swapsize
+	memsize=$(free | gawk '$1 == "Mem:" {print $2}')
+	swapsize=$(free | gawk '$1 == "Swap:" {print $2}')
+	memsize=$(($memsize/2))
+	tmpsize=$(($swapsize+$memsize))
+}
+
+#
 # parse parameters
 #
 
@@ -2695,92 +2708,69 @@ inststage)
 
 -chroot)
 	#chroot to new system.
-
+	#$1=-chroot
 	#check parameter
-	if [ -z "$2" ]; then
+	shift
+	if [ -z "$1" ]; then
 		echo "Please specify destination, such as:"
-		echo -e "\t gpkg chroot /mnt/xg"
+		echo -e "\t gpkg chroot /mnt/xg /bin/bash"
 		exit 1
 	fi
+	newroot=$1
 
-	#check tools directory
-#	#if [ -d "$2/tools" ]; then
-#		echo "$2 check OK"
-#	else 
-#		echo "$2/tools not found" 
-#		exit 2
-#	fi
+	shift
+	if [ -z $1 ]; then
+		bashfile="/bin/bash"
+	else
+		bashfile="$@"
+	fi
+
 
 	#first, check tmpfs
 
-	mkdir -p $2/tmp
-	chmod 1777 $2/tmp
-	umount $2/tmp 2>/dev/null
+	mkdir -p $newroot/tmp
+	chmod 1777 $newroot/tmp
+	umount $newroot/tmp 2>/dev/null
 
-	tmpsize=$(df | gawk '$1 == "tmpfs" && $6 == "/dev/shm" {print $4}')
-	if [ -n "$tmpsize" ]; then
-		if [ "$tmpsize" -ge "3000000" ]; then
-			showOK ">> tmpfs size check OK, enabled."
-			#mount tmp fs.
-			mkdir -p /dev/shm/xgtmp
-			chmod 1777 /dev/shm/xgtmp
-        		mount --bind /dev/shm/xgtmp $2/tmp
-			err_check "Error: mount $2/tmp failed."
-		else
-			echo -e $WARNING">> tmpfs is too small, disabled"$NORMAL
-		fi
+	xg_gettmpsize
+	if [ "$tmpsize" -ge "3000000" ]; then
+		showOK ">> tmpfs size check OK, enabled."
+		#mount tmp fs.
+       	mount -t tmpfs tmpfs $newroot/tmp -o size=$tmpsize
+		err_check "Error: mount $newroot/tmp failed."
 	else
-		echo -e $WARNING">> no tmpfs on /dev/shm found, disable it"$NORMAL
+		echo -e $WARNING">> tmpfs is too small, disabled"$NORMAL
 	fi
-
-	#prepare 2 devie: null and console
-	[ -d $2/dev ] || mkdir $2/dev
-        [ -c $2/dev/null ] || mknod -m 666 $2/dev/null c 1 3
-        [ -c $2/dev/console ] || mknod -m 600 $2/dev/console c 5 1
-
 	#mount proc/sysfs/devfs
-	mkdir -p $2/proc
-        mkdir -p $2/sys
-        mkdir -p $2/dev
+	mkdir -p $newroot/proc
+    mkdir -p $newroot/sys
+    mkdir -p $newroot/dev
 
-	umount $2/proc 2>/dev/null
-        umount $2/sys 2>/dev/null
-        umount $2/dev 2>/dev/null
+	umount $newroot/proc 2>/dev/null
+    umount $newroot/sys 2>/dev/null
+    umount $newroot/dev 2>/dev/null
 
-	mount -t proc none $2/proc
-	err_check "Error: mount $2/proc failed."
-        mount -t sysfs none $2/sys
-	err_check "Error: mount $2/sys failed."
-        mount --bind /dev $2/dev
-	err_check "Error: mount $2/dev failed."
+	mount -t proc none $newroot/proc
+	err_check "Error: mount $newroot/proc failed."
+    mount -t sysfs none $newroot/sys
+	err_check "Error: mount $newroot/sys failed."
+    mount --bind /dev $newroot/dev
+	err_check "Error: mount $newroot/dev failed."
 
 	#prepare resolv.conf
-	[ -d $2/etc ] || mkdir $2/etc
-        [ -f $2/etc/resolv.conf ] || cp /etc/resolv.conf $2/etc
+	[ -d $newroot/etc ] || mkdir $newroot/etc
+    [ -f $newroot/etc/resolv.conf ] || cp /etc/resolv.conf $newroot/etc
 
 
 	#chroot
-	if [ -f $2/bin/bash ]; then
-		bashfile="/bin/bash"
-	else
-		bashfile="/tools/bin/bash"
-	fi
+	envfile="/usr/bin/env"
 
-	if [ -f $2/usr/bin/env ]; then
-		envfile="/usr/bin/env"
-		echo "/usr/bin/env"
-	else
-		envfile="/tools/bin/env"
-		echo "/tools/bin/env"
-	fi
-
-
-	chroot $2 $envfile -i \
+	chroot $newroot $envfile -i \
 		HOME=/root TERM="$TERM" PS1='\u:\w\$ ' \
-		PATH=/bin:/usr/bin:/sbin:/usr/sbin:/tools/bin \
+		PATH=/bin:/usr/bin:/sbin:/usr/sbin \
 		XGSIGN=xg_chroot\
-		$bashfile  +h
-	err_check "Error: chroot to $2 failed."
+		$bashfile
+	err_check "Error: chroot to $newroot failed."
 	;;
 
 -unchroot)
@@ -2793,7 +2783,6 @@ inststage)
 
 	showinfo ">> unmounting $2.."
 	umount  $2/tmp 2>/dev/null
-	rm -rf /dev/shm/xgtmp 2>/dev/null
 	
 	umount  $2/proc
 	err_check "Error: unmount $2/proc failed."
