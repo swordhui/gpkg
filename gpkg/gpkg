@@ -215,7 +215,7 @@ str_isInExactly()
 err_check()
 {
 	if [ $? != 0 ]; then
-		echo -e $FAILURE"$1"
+		showFailed "$1"
 		exit 1
 	fi
 }
@@ -1838,22 +1838,37 @@ gpkg_do_inst_stage()
 	done
 }
 
+gpkg_ckstage_clear()
+{
+ 	ckcount="0"
+	ckbdcount="0"
+	ckbadnames=""
+}
+
+gpkg_ckstage_showresult()
+{
+	local bdcnt=0
+
+ 	showinfo "$ckcount checked, $ckbdcount failed"
+	for i in $ckbadnames ; 
+	do
+		bdcnt=$(($bdcnt+1))
+		showFailed "$bdcnt\t\t$i"
+	done
+}
+
 #read from file, and do it one by one
 #$1 is total count.
 gpkg_do_ck_stage1()
 {
 	local line
-	local count="0"
-	local bdcount="0"
-	local badnames=""
-
 	echo "checking $1 packages form $XGPATH_OLDPACKS ..."
 
 	while IFS= read -r line
 	do
 		[ -z "$line" ] && continue
-		((count++))
-		#showinfo "\n*** $count/$1 *** checking $line..\n"
+		((ckcount++))
+		#showinfo "\n*** $ckcount/$1 *** checking $line..\n"
 
 		#check version
 		gpkg_getxgbfile "$line"
@@ -1865,22 +1880,17 @@ gpkg_do_ck_stage1()
 
 		if [ -f "$XGPATH_OLDPACKS/$N-$V$R.xgp" ]; then
 			#exits
-			showOK "$count $N-$V$R is OK"
+			showOK "$ckcount $N-$V$R is OK"
 			continue
 		else
 			#bad, record name
-			showFailed "$count $N-$V$R is failed"
-			badnames+=" $N-$V$R "
-			((bdcount++))
+			showFailed "$ckcount $N-$V$R is failed"
+			ckbadnames+=" $N-$V$R "
+			((ckbdcount++))
 		fi
 	done
 
-	echo "$count checked, $bdcount failed"
-	for i in $badnames ; 
-	do
-		echo $i
-	done
-}
+	}
 
 #read from a file, $1 is file name, $2 is operation
 gpkg_readfile()
@@ -2673,7 +2683,7 @@ stage[0-4])
 ckstage)
 	#check stage
 	if [ -z "$2" ]; then
-		showFailed "Please specify stage number, such as gpkg inst stage 0 /var/xiange/packags"
+		showFailed "Please specify stage number, such as gpkg ckstage 0 /var/xiange/packags\n\tor gpkg ckstage all /var/xiange/packages"
 		exit 1
 	fi
 	if [ -z "$3" ]; then
@@ -2681,16 +2691,32 @@ ckstage)
 		exit 2
 	fi
 
-	#read from list, and install it one by one.
-	lines=$(wc -l $XGPATH_LIB/stages/stage$2)
-	XGPATH_OLDPACKS="$3"
-	gpkg_do_ck_stage1 $lines  < $XGPATH_LIB/stages/stage$2
-	;;
+	if [ "$2" == "all" ]; then
+		gpkg_ckstage_clear
+		for i in 0 1 2 3
+		do
+			showinfo "ckstage $i..."
+			#read from list, and install it one by one.
+			lines=$(wc -l $XGPATH_LIB/stages/stage$i)
+			XGPATH_OLDPACKS="$3"
+			gpkg_do_ck_stage1 $lines  < $XGPATH_LIB/stages/stage$i
+		done
+		gpkg_ckstage_showresult
+	else
+		#read from list, and install it one by one.
+		gpkg_ckstage_clear
+		lines=$(wc -l $XGPATH_LIB/stages/stage$2)
+		XGPATH_OLDPACKS="$3"
+		gpkg_do_ck_stage1 $lines  < $XGPATH_LIB/stages/stage$2
+		gpkg_ckstage_showresult
+	fi
+
+		;;
 
 inststage)
 	#install stage 
 	if [ -z "$2" ]; then
-		showFailed "Please specify stage number, such as gpkg inst stage 0 /var/xiange/packags"
+		showFailed "Please specify stage number, such as gpkg inststage 0 /var/xiange/packags"
 		return 1
 	fi
 	if [ -z "$3" ]; then
