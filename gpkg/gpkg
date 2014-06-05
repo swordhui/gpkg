@@ -57,7 +57,7 @@ BRACKET="\\033[1;34m" # Brackets are blue
 #
 # version and  usage 
 #
-gpkg_version=0.10.44
+gpkg_version=0.10.45
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -443,7 +443,7 @@ gpkg_searchInstalled()
 		atom_parse $file
 
 		#get date.
-		csv_split `cat $searchpath/$N-$V$R.date`
+		IFS=, read -r -a value < $searchpath/$N-$V$R.date
 		t1=${value[0]}
 		t2=${value[1]}
 
@@ -1730,12 +1730,13 @@ gpkg_read()
 	local line
 	local count
 	local -a value
+	local rest="0"
 
-	while IFS= read -r line
+	while IFS=, read -r -a value
 	do
-		[ -z "$line" ] && continue
+		count=${#value[*]}
+		[ $count == 0 ] && continue
 
-		csv_split "$line"
 		case "$XG_CSV_OP" in
 		l)
 			gpkg_csvop_ls
@@ -1756,6 +1757,7 @@ gpkg_read()
 			gpkg_csvop_ls
 			;;
 		esac
+		unset value
 	done
 }
 
@@ -1913,7 +1915,7 @@ gpkg_list_inst_info()
 	atom_parse_path "$1"
 
 	#get date.
-	csv_split `cat $XGPATH_DB/$T/$N/$N-$V$R.date`
+	IFS=, read -r -a value < $XGPATH_DB/$T/$N/$N-$V$R.date
 	t1=${value[0]}
 	t2=${value[1]}
 
@@ -2717,17 +2719,18 @@ inststage)
 	#install stage 
 	if [ -z "$2" ]; then
 		showFailed "Please specify stage number, such as gpkg inststage 0 /var/xiange/packags"
-		return 1
+		exit 1
 	fi
 	if [ -z "$3" ]; then
 		showFailed "Please specify compiled package directory , such as gpkg inst stage 0 /var/xiange/packags"
-		return 2
+		exit 2
 	fi
 
 	#read from list, and install it one by one.
 	lines=$(wc -l $XGPATH_LIB/stages/stage$2)
 	XGPATH_OLDPACKS="$3"
 	gpkg_do_inst_stage $lines  < $XGPATH_LIB/stages/stage$2
+	exit 0
 	;;
 
 
