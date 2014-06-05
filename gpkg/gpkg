@@ -2128,49 +2128,54 @@ gpkg_wait_10sec()
 
 }
 
+# input:
+#	$1		: pathname of xgp file
+# return: 
+#	$dbpath	: 	dbpath
+#	$packname: pathname of xgp file
+#	$xibpath: tmp dir for info file
+#	$xgbfile: pathname of xgp file
 
-
-gpkg_install_binary_package()
+gpkg_extract_bininfo()
 {
-	local xgbfile
-	local atom
-	local dbpath
-	local packname
-	local infofile
-	local xippath
+	showinfo ">> parsing $1..."
 
 	dbpath=${XGPATH_DB_RAW#/}
 	packname=$1
+	xibpath=/tmp/$UID/$$
+	rm -rf $xibpath 2>/dev/null
+	mkdir -p ${xibpath}
+	err_check "[Error] make tmp $xibpath failed.\n"
 
-	showinfo ">> parsing $1..."
+	tar xf "$packname" -C $xibpath "$dbpath" 2>/dev/null
+	err_check "Error: not xgp format"
+
 	#fine xgbfile in package.
-	xgbfile=$(tar tf "$1" | grep "^$dbpath/.*\.xgb")
-	err_check "get info from xgb file failed."
+	xgbfile=$(find $xibpath/$dbpath -iname "*.xgb" 2>/dev/null)
 
 	#check xgb
-	[ -z "$xgbfile" ] && showFailed "Not xgp format" && exit 1
+	[ -z "$xgbfile" ] && showFailed "Error: not xgp format" && exit 1
+}
 
-	atom_parse_path "$xgbfile"
-	[ -z "$T" ] && showFailed "Not xgp format" && exit 1
+#
+# input:
+#	$xibpath
+gpkg_clear_bininfo()
+{
+	rm -rf $xibpath 2>/dev/null
+}
 
-	showinfo ">> checking $T/$N-$V$R ..."
-
-	#check XG_DB_RAW
-	if [ "$XGPATH_DB_RAW" != "/var/xiange/db" ]; then
-		showFailed "XGPATH_DB_RAW changed to $XGPATH_DB_RAW."
-		exit 2
-	fi
-	#get .file from packet
-	xibpath=/tmp/$UID/$N-$V$R
-	rm -rf $xibpath
-	mkdir -p ${xibpath}/bak/$T
-	err_check "[Error] make tmp $xibpath failed.\n"
+#
+# input:
+#	$packname
+#	$xibpath
+#	$T,N,V,R
+gpkg_install_binary_package_raw()
+{
+	local infofile
 
 	infofile="var/xiange/db/$T/$N/$N-$V$R.file"
 	file_conflict="$xibpath/$N-$V$R.conflict"
-	tar xf "$packname" -C $xibpath "$infofile" 
-	err_check "[Error] get file info from pack failed."
-
 	pushd $xibpath > /dev/null
 
 	#check all files
@@ -2184,7 +2189,7 @@ gpkg_install_binary_package()
 
 	#copy to root
 	showinfo ">> Moving files to $XGROOT/ ..."
-	tar xjpf "$1" --keep-directory-symlink -C $XGROOT/ 
+	tar xjpf "$packname" --keep-directory-symlink -C $XGROOT/ 
 	err_check "[Error] copy binary package to / failed"
 
 	gpkg_keep_conflict "$file_conflict"
@@ -2206,7 +2211,7 @@ gpkg_install_binary_package()
 	#include package build scripts
 	XGPATH_SCRIPT=$XGPATH_DB/$T/$N
 	. $XGPATH_SCRIPT/$N-$V$R.xgb
-	err_check "[Error] $XGPATH_SCRIPT/$1 not found."
+	err_check "[Error] $XGPATH_SCRIPT/$N-$V$R.xgb not found."
 
 	#init build script file
 	xgb_init
@@ -2221,6 +2226,33 @@ gpkg_install_binary_package()
 	showOK "[***] Binary package $N-$V$R installed to you system."
 }
 
+gpkg_install_binary_package()
+{
+	local xgbfile
+	local atom
+	local dbpath
+	local packname
+	local infofile
+
+	gpkg_extract_bininfo "$1"
+
+	atom_parse_path "$xgbfile"
+	showinfo ">> checking $T/$N-$V$R ..."
+
+	#check XG_DB_RAW
+	if [ "$XGPATH_DB_RAW" != "/var/xiange/db" ]; then
+		showFailed "XGPATH_DB_RAW changed to $XGPATH_DB_RAW."
+		exit 2
+	fi
+	#get .file from packet
+	mkdir -p ${xibpath}/bak/$T
+	err_check "[Error] make tmp $xibpath failed.\n"
+
+	gpkg_install_binary_package_raw
+
+	gpkg_clear_bininfo
+}
+
 gpkg_upgrade_binary_package()
 {
 	local xgbfile
@@ -2228,7 +2260,6 @@ gpkg_upgrade_binary_package()
 	local dbpath
 	local packname
 	local infofile
-	local xippath
 	local newv
 	local newr
 	local newt
@@ -2236,16 +2267,7 @@ gpkg_upgrade_binary_package()
 	local oldr
 	oldfile=""
 
-	dbpath=${XGPATH_DB_RAW#/}
-	packname=$1
-
-	showinfo ">> parsing $1..."
-	#fine xgbfile in package.
-	xgbfile=$(tar tf "$1" | grep "^$dbpath/.*\.xgb")
-	err_check "get info from xgb file failed."
-
-	#check xgb
-	[ -z "$xgbfile" ] && showFailed "Not xgp format" && exit 1
+	gpkg_extract_bininfo "$1"
 
 	#echo "xgb=$xgbfile"
 	atom_parse_path "$xgbfile"
@@ -2260,7 +2282,7 @@ gpkg_upgrade_binary_package()
 	gpkg_checkInst
 	if [ "$?" == "0" ]; then
 		#not installed
-		gpkg_install_binary_package "$1"
+		gpkg_install_binary_package_raw
 		return $?
 	fi
 
@@ -2271,6 +2293,7 @@ gpkg_upgrade_binary_package()
 	#if [ "$V$R" == "$newv$newr" ]; then
 	#	showOK "$N-$V$R already installed, replace only"
 	#fi
+
 
 	showinfo ">> update $N-$V$R to $N-$newv$newr ..."
 	oldv=$V
@@ -2284,12 +2307,7 @@ gpkg_upgrade_binary_package()
 		showFailed "XGPATH_DB_RAW changed to $XGPATH_DB_RAW."
 		exit 2
 	fi
-	#get .file from packet
-	xibpath=/tmp/$UID/$N-$V$R
-	rm -rf $xibpath
 	mkdir -p ${xibpath}/bak/$T
-	err_check "[Error] make tmp $xibpath failed.\n"
-
 	#old .file
 	if [ -f $XGPATH_DB/$T/$N/$N-$oldv$oldr.file ]; then
 		mv $XGPATH_DB/$T/$N ${xibpath}/bak/$T
@@ -2308,9 +2326,6 @@ gpkg_upgrade_binary_package()
 
 	infofile="var/xiange/db/$T/$N/$N-$V$R.file"
 	file_conflict="$xibpath/$N-$V$R.conflict"
-	tar xf "$packname" -C $xibpath "$infofile" 
-	err_check "[Error] get file info from pack failed."
-
 	pushd $xibpath > /dev/null
 
 	#check all files
@@ -2367,6 +2382,7 @@ gpkg_upgrade_binary_package()
 	xgb_update_last
 
 	showOK "[***] Binary package $N-$V$R installed to you system."
+	gpkg_clear_bininfo
 }
 
 
