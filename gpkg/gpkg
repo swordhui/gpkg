@@ -53,6 +53,15 @@ FAILURE="\\033[1;31m" # Failures are red
 INFO="\\033[1;36m" # Information is light cyan
 BRACKET="\\033[1;34m" # Brackets are blue
 
+if [ "$GPKGNC" == "1" ]; then
+	NORMAL="" # Standard console grey
+	SUCCESS="" # Success is green
+	WARNING="" # Warnings are yellow
+	FAILURE="" # Failures are red
+	INFO="" # Information is light cyan
+	BRACKET="" # Brackets are blue
+fi
+
 
 #
 # version and  usage 
@@ -84,6 +93,7 @@ gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\trm package-version	$NORMAL\tremove xgb file with vim\n
 	$INFO\t-info		$NORMAL\t\tshow gpkg parameters. to modify parameters, gpkg info > $XGROOT/etc/xgparas, then edit it.\n
 XianGe base is at $XGPATH\n
+	$INFO\tGPKGNC$NORMAL\t\t\"GPKGNC=1 gpkg\" to remove output color.\n
 "
 
 #only pack?
@@ -716,12 +726,9 @@ gpkg_download()
 
 gpkg_rm_dir_safe()
 {
-	local files
-
-	files=$(ls "$1" 2>/dev/null)
-	if [ -z "$files" ]; then
-		printf "Remove dir %s\n"  "$1"
-		rm -d "$1" 2>/dev/null
+	rm -d "$1" 2>/dev/null
+	if [ "$?" == "0" ]; then
+		showinfo "RM (D) $1"
 	fi
 }
 
@@ -890,27 +897,27 @@ gpkg_rm_packgeinfo()
 	local destpath=$XGPATH_SCRIPT
 
 	#remove config file
-	echo "remove file $destpath/$N-$V$R.config"
+	echo "RM (F) $destpath/$N-$V$R.config"
 	rm -f $destpath/$N-$V$R.config
 	rm -f $destpath/$N-$V$R.config.gz
 	rm -f $destpath/$N-$V$R.para
 
 	#remove scripts file
-	echo "remove file $destpath/$N-$V$R.xgb"
+	echo "RM (F) $destpath/$N-$V$R.xgb"
 	rm -f $destpath/$N-$V$R.xgb
 	err_check ">> Remove $N-$V$R failed."
 
 	#remove list file
-	echo "remove file $destpath/$N-$V$R.file"
+	echo "RM (F) $destpath/$N-$V$R.file"
 	rm -f $destpath/$N-$V$R.file
 
 	#remove test file.
-	echo "remove file $destpath/$N-$V$R.test"
+	echo "RM (F) $destpath/$N-$V$R.test"
 	rm -f $destpath/$N-$V$R.test
 	rm -f $destpath/$N-$V$R.test.gz
 
 	#remove date file
-	echo "remove file $destpath/$N-$V$R.file"
+	echo "RM (F) $destpath/$N-$V$R.file"
 	rm -f $destpath/$N-$V$R.date
 
 	#remove directory
@@ -1506,27 +1513,27 @@ gpkg_csvop_ls()
 	case "${value[0]}" in
 	D)
 		#directory
-		printf "$NORMAL%s| %8s| $INFO%s\n" "d" "${value[2]}" "${value[1]}"
+		printf "%s| %8s| $INFO%s$NORMAL\n" "d" "${value[2]}" "${value[1]}"
 		;;
 	S)
 		#Link
-		printf "$NORMAL%s| %8s| $BRACKET%s\n" "l" "${value[2]}" "${value[1]}"
+		printf "%s| %8s| $BRACKET%s$NORMAL\n" "l" "${value[2]}" "${value[1]}"
 		;;
 	F)
 		#File
-		printf "$NORMAL%s| %8s| $FAILURE%s\n" " " "${value[2]}" "${value[1]}"
+		printf "%s| %8s| $FAILURE%s$NORMAL\n" " " "${value[2]}" "${value[1]}"
 		;;
 
 	I)
 		#totle
-		printf "$WARNING\nFile: %s, Dir: %s, Link %d, Size: %dK\n" \
+		printf "$WARNING\nFile: %s, Dir: %s, Link %d, Size: %dK$NORMAL\n" \
 			"${value[1]}"\
 			"${value[2]}" "${value[3]}" "${value[5]}"
 		;;
 
 	*)
 		#unknown
-		printf "$NORMAL%s| %8s| $FAILURE%s\n" " " "${value[2]}" "${value[1]}"
+		printf "%s| %8s| $FAILURE%s$NORMAL\n" " " "${value[2]}" "${value[1]}"
 		;;
 
 	esac
@@ -1563,7 +1570,10 @@ gpkg_csvop_rm_file()
 			showFailed "RM (O) $XGROOT${value[1]} failed"
 		fi
 		;;
-
+	D)
+		#Directory.
+		gpkg_mark_remove "${value[1]}"
+		;;
 	esac
 	
 }
@@ -1611,25 +1621,38 @@ gpkg_csvop_check_file()
 	
 }
 
+gpkg_csvop_mark_old()
+{
+	case "${value[0]}" in
+	I)
+		#info
+		showinfo  ">> check old info done."
+		;;
+	*)
+		delmark["${value[1]}"]="${value[0]}"
+		;;
+	esac
+}
+
+	
 gpkg_csvop_update_file()
 {
 	local cname
 	local oname
-	local fname
 	local ftype
+	local otype
 
 	oname="${value[1]}"
 	cname="$XGROOT${value[1]}"
-	fname=$(echo $oname | sed "s@\/@\\\/@g")
-	fname=$(echo $fname | sed "s@\[@\\\[@g")
 	ftype=${value[0]}
+	otype=${delmark["${value[1]}"]}
 
 	case "${value[0]}" in
 	S)
 		#symbol.
-		sed -i "/^S,$fname,/d" $oldfile
-		if [ "$?" == "0" ]; then
-			#found in old package, skip
+		if [ -n "$otype" ]; then
+			#found in old package, skip and remove mark
+			unset delmark['${value[1]}']
 			echo  "OK   (US) $cname"
 		else
 			#not found in old package
@@ -1639,9 +1662,9 @@ gpkg_csvop_update_file()
 	F)
 
 		#check in old file
-		sed -i "/^F,$fname,/d" $oldfile
-		if [ "$?" == "0" ]; then
+		if [ -n "$otype" ]; then
 			#found in old package, skip
+			unset delmark['${value[1]}']
 			echo  "OK   (UF) $cname"
 		else
 			#not found in old packge
@@ -1657,9 +1680,9 @@ gpkg_csvop_update_file()
 		;;
 	D)
 		#dirctory
-		sed -i "/^D,$fname,/d" $oldfile
-		if [ "$?" == "0" ]; then
+		if [ -n "$otype" ]; then
 			#found in old package, skip
+			unset delmark['${value[1]}']
 			echo  "OK   (UD) $cname"
 		else
 			#new directory
@@ -1676,9 +1699,9 @@ gpkg_csvop_update_file()
 		showinfo  ">> check done."
 		;;
 	*)
-		sed -i "/^$ftype,$fname,/d" $oldfile
-		if [ "$?" == "0" ]; then
+		if [ -n "$otype" ]; then
 			#found in old package, skip
+			unset delmark['${value[1]}']
 			echo  "OK   (U$ftype) $cname"
 		else
 			#new directory
@@ -1689,7 +1712,6 @@ gpkg_csvop_update_file()
 				showinfo  "OK   (N$ftype) $cname"
 			fi
 		fi
-
 		;;
 	
 	esac
@@ -1714,16 +1736,6 @@ gpkg_reverse_remove()
 	done
 }
 
-gpkg_csvop_rm_dir()
-{
-	case "${value[0]}" in
-	D)
-		#Directory.
-		gpkg_mark_remove "${value[1]}"
-		;;
-	esac
-}
-
 # read from stdin
 gpkg_read()
 {
@@ -1741,17 +1753,17 @@ gpkg_read()
 		l)
 			gpkg_csvop_ls
 			;;
-		f)
-			gpkg_csvop_rm_file
-			;;
 		d)
-			gpkg_csvop_rm_dir
+			gpkg_csvop_rm_file
 			;;
 		c)
 			gpkg_csvop_check_file
 			;;
 		u)
 			gpkg_csvop_update_file
+			;;
+		o)
+			gpkg_csvop_mark_old
 			;;
 		*)
 			gpkg_csvop_ls
@@ -1923,7 +1935,7 @@ gpkg_list_inst_info()
 	csv_split `tail -n 1 $XGPATH_DB/$T/$N/$N-$V$R.file`
 	tsize=${value[5]}
 
-	printf "$NORMAL%s %s $INFO%6sK $FAILURE%s\n" $t1 $t2 $tsize $N-$V$R
+	printf "%s %s $INFO%6sK $FAILURE%s$NORMAL\n" $t1 $t2 $tsize $N-$V$R
 }
 
 gpkg_list_installed()
@@ -1955,6 +1967,155 @@ gpkg_list_package()
 	gpkg_find_insalled_pkg "$1"
 	gpkg_list_showallfile "$installed_xgb"
 }
+
+gpkg_remove_file_basedon_mark()
+{
+	local ftype
+
+	# remove all files
+	for i in "${!delmark[@]}"
+	do
+		ftype=${delmark["$i"]}
+
+		case "$ftype" in
+
+		S)
+			#symbol.
+			unlink "$XGROOT${i}"
+			if [ "$?" == "0" ]; then
+				echo "RM (S) ${i}"
+			else
+				showFailed "RM (S) $XGROOT${i} failed"
+			fi
+			unset delmark['$i']
+			;;
+		F)
+			#file
+			unlink "$XGROOT${i}"
+			if [ "$?" == "0" ]; then
+				echo "RM (F) ${i}"
+			else
+				showFailed "RM (F) $XGROOT${i} failed"
+			fi
+			unset delmark['$i']
+			;;
+		O)
+			#device or other
+			unlink "$XGROOT${i}"
+			if [ "$?" == "0" ]; then
+				echo "RM (O) ${i}"
+			else
+				showFailed "RM (O) $XGROOT${i} failed"
+			fi
+			unset delmark['$i']
+			;;
+		esac
+	done
+
+	local tmpraw
+	local tmpsort
+
+	tmpraw=/tmp/$UID/rm.$$.raw
+	tmpsort=/tmp/$UID/rm.$$.sort
+
+	exec 6>$tmpraw
+	err_check "open $tmpraw failed."
+
+	#remove all dirs in reversed order
+	for i in "${!delmark[@]}"
+	do
+		ftype=${delmark["$i"]}
+
+		case "$ftype" in
+		D)
+			echo "$i" >&6
+			;;
+		*)
+			;;
+		esac
+	done
+
+	exec 6>&-
+	err_check "close $tmpraw failed."
+
+	sort $tmpraw > $tmpsort
+	
+	local tdir
+
+	while IFS= read -r tdir; 
+	do
+		gpkg_rm_dir_safe "$tdir"
+	done < $tmpsort
+
+	rm $tmpraw 2>/dev/null
+	rm $tmpsort 2>/dev/null
+}
+
+#remove packet, $1=type_db_path, $2=$N, $3=$V if have, $4=$R if have
+gpkg_do_remove_package_mark()
+{
+	local file
+	local count
+	local -a value
+	local t1
+	local t2
+	local tsize
+	local infofile
+	local xgbfilen
+
+	#echo "T=$1 N=$2 V=$3 R=$4"
+
+	XGPATH_SCRIPT="$1/$2"
+	#echo scriptpath $XGPATH_SCRIPT
+	if [ -z "$3$4" ]; then
+		#no version specified
+		file=$(ls $XGPATH_SCRIPT/*.xgb 2>/dev/null | head -n 1 )
+	else
+		#version specified.
+		file=$XGPATH_SCRIPT/$2-$3$4.xgb
+	fi
+
+
+	xgbfilen="$file"
+	atom_parse_path $xgbfilen
+
+	
+	if [ -f "$xgbfilen" ]; then
+		showinfo "remove $T/$N-$V$R..."
+	else
+		showFailed "$xgbfilen not found."
+		exit 1
+	fi
+
+	infofile=$XGPATH_SCRIPT/$N-$V$R.file
+
+
+	#call init
+	. $XGPATH_SCRIPT/$N-$V$R.xgb
+	err_check "include xgb file failed."
+
+	xgb_init
+	err_check "call xgb_init failed"
+
+	#call pre rm
+	xgb_prerm
+	err_check "call xgb_prerm failed"
+
+
+	gpkg_remove_file_basedon_mark
+
+	xgb_postrm
+	err_check "call xgb_postrm failed"
+
+	#remove infos.
+	gpkg_rm_packgeinfo
+
+	#update last change time
+	xgb_update_last
+
+	showOK "[***] $N-$V$R removed."
+}
+
 
 #remove packet, $1=type_db_path, $2=$N, $3=$V if have, $4=$R if have
 gpkg_do_remove_package()
@@ -2006,14 +2167,11 @@ gpkg_do_remove_package()
 	xgb_prerm
 	err_check "call xgb_prerm failed"
 
-	#remove all files
-	gpkg_readfile $infofile "f"
-
 	#reset directory list
-	unset gpkg_mark_remove_array
+		unset gpkg_mark_remove_array
 	mark_count=0
 
-	#record all directorys
+	#remove all files
 	gpkg_readfile $infofile "d"
 
 	#remove all dirs
@@ -2267,6 +2425,8 @@ gpkg_upgrade_binary_package()
 	local oldr
 	oldfile=""
 
+	declare -A delmark
+
 	gpkg_extract_bininfo "$1"
 
 	#echo "xgb=$xgbfile"
@@ -2318,11 +2478,15 @@ gpkg_upgrade_binary_package()
 	fi
 	oldfile=$xibpath/bak/$T/$N/$N-$oldv$oldr.file
 	if [ -f $oldfile ]; then
-		echo file copy OK
+		echo "" > /dev/null
 	else
 		showFailed "$oldfile is not found."
 		exit 2
 	fi
+
+	showinfo ">> parsing old package $N-${oldv}..."
+	gpkg_readfile "$oldfile" "o"
+
 
 	infofile="var/xiange/db/$T/$N/$N-$V$R.file"
 	file_conflict="$xibpath/$N-$V$R.conflict"
@@ -2350,7 +2514,7 @@ gpkg_upgrade_binary_package()
 	gpkg_keep_conflict "$file_conflict"
 
 	#remove old files
-	gpkg_do_remove_package "$xibpath/bak/$T" "$N" "$oldv" "$oldr"
+	gpkg_do_remove_package_mark "$xibpath/bak/$T" "$N" "$oldv" "$oldr"
 
 	V=$newv
 	R=$newr
