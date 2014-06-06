@@ -1125,12 +1125,31 @@ gpkg_do_build()
 }
 
 
+
+gpkg_check_depmark()
+{
+	local pname="$T/$N-$V$R"
+	local isHave
+
+	isHave=${deplist["$pname"]}
+
+	if [ -n "$isHave" ]; then
+		#already have
+		return 0
+	else
+		#add to list
+		deplist["$pname"]=1
+		return 1
+	fi
+}
+
 #check packeg status. $1 is specified atom such as "vim-7.3.2" or "vim"
 #return 0: no need upgrade. $newest is the newtest version xgb file 
 #return 1: need upgrade. $newest is newest xgb file. $oldinst_atom is current atom
 #return 2: need downgrade. $newest is newest xgb file. $oldinst_atom is current atom
 #return 3: package is not installed, need installed to $newest
 #return 4: package is not found
+#return 5: package has already in list
 #others: error
 
 gpkg_check_packge()
@@ -1148,6 +1167,11 @@ gpkg_check_packge()
 	if [ "$?" == "0" ]; then
 		#check if installed.
 		atom_parse_path $newest
+		gpkg_check_depmark
+		if [ "$?" == "0" ]; then
+			#already in list
+			return 5
+		fi
 		gpkg_checkInst
 		if [ "$?" == "0" ]; then 
 			#not installed.
@@ -1247,6 +1271,10 @@ gpkg_install_dep()
 
 	"3")
 		#need install 
+		;;
+	"5")
+		#already in list
+		return 0
 		;;
 
 	*)
@@ -1463,6 +1491,11 @@ gpkg_showdep()
 		atom_parse_path $newest
 		showFailed "${2} $1 ==> (N)$N-$V$R"
 		cnt_install=$(($cnt_install+1))
+		;;
+
+	"5")
+		#already in list
+		return 0
 		;;
 
 	*)
@@ -2749,6 +2782,9 @@ xg_gettmpsize()
 #reload parameters if available
 [ -f $XGROOT/etc/xgparas ] && . $XGROOT/etc/xgparas
 
+unset deplist
+declare -A deplist
+
 case "${1}" in
 -v)
 	#show version.
@@ -3005,7 +3041,6 @@ inststage)
 	#show dependece
 
 	#unset DEP,RDEP
-	unset GPKG_DEP_LIST
 	cnt_install="0"
 
 	#show dependant
