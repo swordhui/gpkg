@@ -2006,12 +2006,16 @@ gpkg_list_check_version()
 	fi
 	atom_parse_path "$newest"
 
-	if [ "$V$R" != "$oldv$oldr" ]; then
+	atom_cmp "$oldn-$oldv$oldr" "$N-$V$R"
+	case "$?" in
+	"2")
 		#need update
 		ucount=$(($ucount+1))
 		printf "$INFO%-6s %-20s $FAILURE(%s -> %s)$NORMAL\n" $ucount "$T/$N" "$oldv$oldr" "$V$R"
-	fi
-	
+		;;
+	*)
+		;;
+	esac
 }
 
 gpkg_list_check_upgrade()
