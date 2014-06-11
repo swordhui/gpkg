@@ -36,6 +36,23 @@ How to use:
 
 
 History:
+
+	0.10.46	2014-06-11
+		add 'gpkg -cu' to check the packages can be upgraded.
+		add 'gpkg -cn' to check the packages havn't been installed to system.
+
+	0.10.45	2014-06-06
+		add 'gpkg -ckstage all'
+		fixed output color bugs
+		add option to disable colorful output
+		operation speed up!
+
+	0.10.44	2014-05-26
+		refine 'gpkg -chroot' 'gpkg -unchroot'.
+
+	0.10.43	2014-05-26
+		refine 'gpkg -chroot' 'gpkg -unchroot'.
+
 	0.10.42	2014-04-21
 		add gpkg ckstage, gpkg inststage for installing xiange system via binary packages.
 		fixed directory bugs

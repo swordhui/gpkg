@@ -66,7 +66,7 @@ fi
 #
 # version and  usage 
 #
-gpkg_version=0.10.45
+gpkg_version=0.10.46
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -88,6 +88,8 @@ gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-rdep package	$NORMAL\tshow reverse dependence\n
 	$INFO\t-pack dir name version 	$NORMAL\tpack all files in dir to xgb file.\n
 	$INFO\t-packraw package $NORMAL\tcontinue install compiled package.\n
+	$INFO\t-cu\t$NORMAL\tcheck which package can be upgrade.\n
+	$INFO\t-cn\t$NORMAL\tcheck new packages in xglib.\n
 	$INFO\tedit package	$NORMAL\tedit xgb file with vim\n
 	$INFO\tnew type/package-version	$NORMAL\tnew xgb file with vim\n
 	$INFO\trm package-version	$NORMAL\tremove xgb file with vim\n
@@ -225,7 +227,7 @@ str_isInExactly()
 err_check()
 {
 	if [ $? != 0 ]; then
-		showFailed "$1"
+		showFailed "$1" >&2
 		exit 1
 	fi
 }
@@ -640,7 +642,7 @@ gpkg_getxgbfile()
 	#echo result=$results, V=$V, R=$R
 	if [ "$count" == "0" ]; then
 		#not found
-		showFailed "$1 is not found."
+		showFailed "$1 is not found." >&2
 		return 2
 	fi
 
@@ -935,21 +937,16 @@ gpkg_checkInst()
 
 	#echo "T=$T, N=$N"
 
-	ifile=$(find $XGPATH_DB/$T/$N -iname "*.file" 2>/dev/null | head -n 1)
-
-	#echo "$ifile"
-
-	if [ "x$ifile" != "x" ]; then
-		#found
-		oldinst_atom=$(basename $ifile .file)
-		#echo "found, atom=$oldinst_atom"
-		return 1
-	else
-		#not found
-		return 0
-	fi
-
-	#[ -f $XGPATH_DB/$T/$N/$N-$V$R.file ] && return 0
+	for ifile in $XGPATH_DB/$T/$N/*.file;
+	do
+		if [ -a "$ifile" ]; then
+			#found
+			oldinst_atom=$(basename $ifile .file)
+			#echo "found, atom=$oldinst_atom"
+			return 1
+		fi
+	done
+	return 0
 }
 
 gpkg_beginbuild()
@@ -1988,6 +1985,112 @@ gpkg_list_installed()
 	done
 }
 
+gpkg_list_check_version()
+{
+	local oldv
+	local oldn
+	local oldr
+	local oldt
+
+	atom_parse_path "$1"
+	oldt="$T"
+	oldn="$N"
+	oldv="$V"
+	oldr="$R"
+
+	gpkg_getxgbfile "$T/$N" 2>/dev/null
+	if [ "$?" != "0" ]; then
+		errpack[$errcount]="$oldt/$oldn-$oldv$oldr"
+		errcount=$(($errcount+1))
+		return 1
+	fi
+	atom_parse_path "$newest"
+
+	if [ "$V$R" != "$oldv$oldr" ]; then
+		#need update
+		ucount=$(($ucount+1))
+		printf "$INFO%-6s %-20s $FAILURE(%s -> %s)$NORMAL\n" $ucount "$T/$N" "$oldv$oldr" "$V$R"
+	fi
+	
+}
+
+gpkg_list_check_upgrade()
+{
+	local gpkg_packs
+	local pack
+	local count=0
+	local ucount=0
+	local errcount=0
+	local -a errpack
+
+
+	gpkg_packs=`find -L $XGPATH_DB -iname *.xgb 2>/dev/null`
+
+	showinfo ">> checking..."
+	
+	for pack in $gpkg_packs
+	do
+		#echo $pack
+		count=$(($count+1))
+		gpkg_list_check_version "$pack"
+	done
+	showinfo ">> done, $count packages checked, $ucount can be upgraded."
+	if [ "$errcount" != "0" ]; then
+		echo ""
+		showFailed "below packages's build script cannot be found:"
+		for ((i=0; i<$errcount; i++))
+		do
+			showFailed "$(($i+1))\t${errpack[$i]}"
+		done
+	fi
+}
+
+gpkg_list_check_new()
+{
+	local gpkg_packs
+	local pack
+	local count=0
+	local ucount=0
+	local pcount=0
+	local phave
+	local uniname
+
+	declare -A packname 
+	showinfo ">> checking..."
+	gpkg_packs=`find -L $XGPATH_LIB -iname *.xgb 2>/dev/null`
+	
+	for pack in $gpkg_packs
+	do
+		#echo $pack
+		count=$(($count+1))
+		atom_parse_path "$pack"
+
+		uniname="$T/$N"
+
+		#check if already checked
+		phave=${packname[$uniname]}
+		if [ -n "$phave" ]; then
+			#already have
+			continue
+		fi
+
+		#record
+		packname[$uniname]="1"
+		pcount=$(($pcount+1))
+
+		#check installed
+		gpkg_checkInst
+		if [ "$?" == "0" ]; then
+			#not installed
+			ucount=$(($ucount+1))
+			echo -e "$ucount\t\t$T/$N"
+		fi
+	done
+
+	showinfo "Done, $count build scripts found, $pcount packages checked, $ucount new"
+	unset packname
+}
+
 #list, $1 is xgb path name
 gpkg_list_showallfile()
 {
@@ -2842,6 +2945,16 @@ case "${1}" in
 -I)
 	#list installed packages, sort by installed time
 	gpkg_list_installed $2
+	;;
+
+-cu)
+	#check installed packgs can be upgrade
+	gpkg_list_check_upgrade
+	;;
+
+-cn)
+	#check new packages in xglibs
+	gpkg_list_check_new
 	;;
 
 -l)
