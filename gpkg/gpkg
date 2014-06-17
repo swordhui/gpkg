@@ -20,6 +20,10 @@ XGPATH_SCRIPT=$XGPATH_LIB
 XGPATH_BUILD=/tmp/xiange
 XGPATH_DEST=
 
+ntmpdir=/tmp/xglfs_check
+nlfsfile=index.html
+nblfsfile=index2.html
+
 #compile parameters
 XGB_ARCH=$(uname -m)
 XGB_PREFIX=
@@ -66,7 +70,7 @@ fi
 #
 # version and  usage 
 #
-gpkg_version=0.10.46
+gpkg_version=0.10.47
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -90,6 +94,7 @@ gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-packraw package $NORMAL\tcontinue install compiled package.\n
 	$INFO\t-cu\t$NORMAL\tcheck which package can be upgrade.\n
 	$INFO\t-cn\t$NORMAL\tcheck new packages in xglib.\n
+	$INFO\t-cklfs\t$NORMAL\tcheck new packages from lfs/blfs website.\n
 	$INFO\tedit package	$NORMAL\tedit xgb file with vim\n
 	$INFO\tnew type/package-version	$NORMAL\tnew xgb file with vim\n
 	$INFO\trm package-version	$NORMAL\tremove xgb file with vim\n
@@ -2868,6 +2873,376 @@ gpkg_rdep()
 
 }
 
+xg_blfs_get_list()
+{
+	showinfo ">> getting the newest blfs book file.."
+	wget -O ${nblfsfile}.tmp \
+		http://www.linuxfromscratch.org/blfs/downloads/svn/
+	err_check "get blfs file list failed."
+
+	mv ${nblfsfile}.tmp $nblfsfile
+	err_check "rename blfs tmp file failed."
+
+	#get lfs book
+	bookname2=$(grep -o "blfs-book-svn-html-[0-9-]*.tar.bz2" \
+		$nblfsfile 2>/dev/null | head -n 1)
+
+	if [ -z "$bookname2" ]; then
+		showFailed "No blfs book found."
+		exit 1
+	fi
+
+	showinfo ">> found blfs book: $bookname2"
+
+	#get book
+	wget -O ${bookname2}.tmp \
+		http://www.linuxfromscratch.org/blfs/downloads/svn/$bookname2
+	err_check "get blfs book $bookname2 failed."
+
+	mv ${bookname2}.tmp $bookname2
+	err_check "rename lfs book file failed."
+}
+
+
+# $1 is blfs book name, $2 is list file
+xg_blfs_uncompress()
+{
+	local blfsdir
+	blfsdir="blfsbook"
+	mkdir -p $blfsdir
+	tar xaf "$1" -C $blfsdir
+	err_check "uncompress $1 failed."
+
+	#remove leading space
+	find blfsbook -type f -exec sed -i "s/^[\t ]*//g" '{}' ';'
+
+	#remove \n
+	find blfsbook -type f -exec sed -i ':a;N;$!ba;s/\n//g' '{}' ';'
+
+	#gen list
+	grep -R -o "Download:[^>]*" blfsbook/* >> $2
+	grep -R -o "Download (HTTP):[^>]*" blfsbook/* >> $2
+	grep -R -o "Download (FTP):[^>]*" blfsbook/* >> $2
+
+}
+
+xg_lfs_get_list()
+{
+	local bookname
+	local bookname2
+
+	mkdir -p $ntmpdir
+	err_check "make dir $ntmpdir failed."
+	
+	cd $ntmpdir
+	err_check "enter dir $ntmpdir failed."
+
+	if [ -a ${nlfsfile}.tmp ]; then
+		rm ${nlfsfile}.tmp
+		err_check "remove tmp file failed."
+	fi
+	
+	showinfo ">> getting the newest lfs book file.."
+	wget -O ${nlfsfile}.tmp \
+		http://www.linuxfromscratch.org/lfs/downloads/systemd/
+	err_check "get lfs file list failed."
+
+	mv ${nlfsfile}.tmp $nlfsfile
+	err_check "rename tmp file failed."
+
+	#get lfs book
+	bookname=$(grep -o "LFS-BOOK-[0-9]*-systemd-NOCHUNKS.html.bz2" \
+		$nlfsfile 2>/dev/null | head -n 1)
+
+	if [ -z "$bookname" ]; then
+		showFailed "Now lfs-systemd book found."
+		exit 1
+	fi
+
+	showinfo ">> found book: $bookname"
+
+	#get book
+	wget -O ${bookname}.tmp \
+		http://www.linuxfromscratch.org/lfs/downloads/systemd/$bookname
+	err_check "get lfs book $bookname failed."
+
+	mv ${bookname}.tmp $bookname
+	err_check "rename lfs book file failed."
+
+	xg_blfs_get_list  
+
+	#uncompress
+	bunzip2 $bookname
+	bookname=$(basename $bookname .bz2)
+
+	#dealwith it, first remove all leading space
+	sed -i "s/^[\t ]*//g" $bookname
+	err_check "rename leading space for $bookname failed."
+
+	#remove /n
+	sed -i ':a;N;$!ba;s/\n//g' $bookname
+	err_check "rename newline mark for $bookname failed."
+
+	#get list
+	grep -o "Download:[^>]*" $bookname > $nlfsfile
+	err_check "get download list failed."
+
+	xg_blfs_uncompress "$bookname2" "$nlfsfile" 
+
+	#remove leading
+	sed -i "s/^.*href=\"//g" $nlfsfile
+	err_check "remove leading mark of $nlfsfile failed."
+
+	sed -i "s/\"$//g" $nlfsfile
+	err_check "remove ending mark of $nlfsfile failed."
+
+	touch $ntmpdir/timelist
+	err_check "record list time failed."
+	showinfo ">> OK"
+}
+
+xg_lfs_get_list2()
+{
+	mkdir -p $ntmpdir
+	err_check "make dir $ntmpdir failed."
+	
+	cd $ntmpdir
+	err_check "enter dir $ntmpdir failed."
+
+	if [ -a ${nlfsfile}.tmp ]; then
+		rm ${nlfsfile}.tmp
+		err_check "remove tmp file failed."
+	fi
+	
+	showinfo ">> getting the newest lfs-systemd file.."
+	wget -O ${nlfsfile}.tmp \
+		http://www.linuxfromscratch.org/lfs/downloads/development/$nlfsfile
+	err_check "get lfs file list failed."
+
+	mv ${nlfsfile}.tmp $nlfsfile
+	err_check "rename tmp file failed."
+	touch $ntmpdir/timelist
+	err_check "record list time failed."
+	showinfo ">> OK"
+}
+
+xg_lfs_compare_get()
+{
+	local t1
+	local t2
+	local t3
+	if [ -a "$ntmpdir/timelist" ]; then
+		touch $ntmpdir/timeck
+		t1=$(date +"%s" -r $ntmpdir/timeck 2>/dev/null)
+		t2=$(date +"%s" -r $ntmpdir/timelist 2>/dev/null)
+		t3=$(($t1-$t2))
+
+		if [ -z "$t1" ]; then
+			showFailed "get tmp time failed."
+			exit 2
+		fi
+		#showinfo ">> timecur=$t1"
+
+		if [ -z "$t2" ]; then
+			showFailed "get list time failed."
+			exit 2
+		fi
+		#showinfo ">> timelist=$t2"
+		#showinfo ">> timediff=$t3"
+
+		if [ $t3 -gt 3600 ]; then
+			showinfo ">> list file too old, update.."
+			xg_lfs_get_list
+		else
+			showinfo ">> list got in 1 hour, use it."
+		fi
+
+		rm $ntmpdir/timeck
+	else
+		xg_lfs_get_list
+	fi
+
+}
+
+
+#$1 is package name , $2 is version
+xg_lfs_check_package()
+{
+	#check if fname OK
+	uniname="$1"
+	haveit="${allname[$uniname]}"
+	#echo "haveit=$haveit"
+	if [ -n "$haveit" ]; then
+		return 0
+	fi
+
+	#record it
+	allname[$uniname]="1"
+	
+	gpkg_getxgbfile "$1" 2>/dev/null
+	if [ "$?" == "0" ]; then
+		#check if installed.
+		atom_parse_path $newest
+
+		#check version
+		atom_vercmp "${V}" "$2" 2>/dev/null
+		retv="$?"
+		case "$retv" in
+		"0")
+			((samecount++))
+			;;
+		"2")
+			#need update
+			ucount=$(($ucount+1))
+			printf "$INFO%-6s %-20s $FAILURE(%s -> %s)$NORMAL\n" \
+				$ucount "$N" "$V" "$2"
+			;;
+		*)
+			#showFailed "Unknown ret $retv ($N,$V ==>  $1,$2)"
+			;;
+		esac
+		return 0
+	else
+		return 1
+	fi
+
+}
+
+
+# $1 is raw name
+xg_lfs_parsename2()
+{
+	local lname
+
+	lname=${1,,}
+	lfsn=$(echo $lname | grep -o "^[a-z]*")
+	lfsv=$(echo $lname | grep -o "[0-9.]*" | head -n 1)
+
+	#echo "lfsn=$lfsn, lfsv=$lfsv"
+
+	xg_lfs_check_package "$lfsn" "$lfsv"
+	if [ "$?" != "0" ]; then
+		#not found
+		return 1
+	else
+		return 0
+	fi
+}
+
+#$1 is xgb file
+xg_lfs_check_file()
+{
+	local lfsn
+	local lfsv
+	local retv
+	T=""
+	N=""
+	V=""
+	R=""
+	#echo -e "\nchecking $fname..."
+	atom_parse_path "$1"
+
+	if [ -z "$N" -o -z "$V" ]; then
+		#not found, try again
+		xg_lfs_parsename2 "$fname"
+		if [ "$?" != "0" ]; then
+			#not found
+			unknowna[cntunknown]="$fname"
+			((cntunknown++))
+			return 1
+		fi
+		return 0
+	fi
+
+	lfsn="${N,,}"
+	lfsv="$V"
+
+	xg_lfs_check_package "$lfsn" "$lfsv"
+	if [ "$?" != "0" ]; then
+		#not found, try again
+		xg_lfs_parsename2 "$fname"
+		if [ "$?" != "0" ]; then
+			#not found
+			unknowna[cntunknown]="$fname"
+			((cntunknown++))
+			return 1
+		fi
+	fi
+
+	return 0
+}
+
+xg_lfs_parse_file()
+{
+	local line
+	local fname
+	local name2
+	local xgbname
+	declare -A allname
+	declare -a unknowna
+	local cntunknown=0
+	local cnt=0
+	local ucount=0
+	local samecount=0
+	local uniname
+	local unifile
+	local haveit
+	declare -A allfile
+
+	while IFS= read -r line
+	do
+		fname=$(basename $line 2>/dev/null) 
+
+		if [ -z "$fname" ]; then
+			continue
+		fi
+
+		#check if fname OK
+		unifile="${fname,,}"
+		haveit="${allfile[$unifile]}"
+		#echo "haveit=$haveit"
+		if [ -n "$haveit" ]; then
+			continue
+		fi
+		allfile[$unifile]="1"
+	
+		#echo -e "\nchecking $fname..."
+		name2=$(echo $fname | grep -o ".*-[0-9.]*")
+		if [ -z "$name2" ]; then
+			xg_lfs_check_file "$fname"
+		else
+			name2=${name2%.}
+			xgbname="/lfs/${name2}.xgb"
+			xg_lfs_check_file "$xgbname"
+		fi
+		((cnt++))
+	done
+
+	echo ""
+	showinfo "$ucount can be updated, same: $samecount, unknown: $cntunknown"
+
+	for ((i=0; i<$cntunknown; i++))
+	do
+		echo -e "$i\t${unknowna[i]}"
+	done
+	unset unknowna
+	unset allname
+	unset allfile
+}
+
+xg_lfs_check_update()
+{
+	#get list file
+	xg_lfs_compare_get
+
+	#parse list file
+	xg_lfs_parse_file < $ntmpdir/$nlfsfile
+}
+
+
+
+
+
 #
 # get max tmpfs size, in bytes
 #
@@ -3212,6 +3587,12 @@ inststage)
 -packraw)
 	gpkg_begin_install "$2"
 	;;
+
+-cklfs)
+	xg_lfs_check_update 
+	;;
+
+
 
 edit)
 	gpkg_begin_new "$2"
