@@ -70,7 +70,7 @@ fi
 #
 # version and  usage 
 #
-gpkg_version=0.10.47
+gpkg_version=0.10.47.1
 gpkg_usage="
 gpkg $SUCCESS$gpkg_version$NORMAL, usage:\n
 	$INFO\t-v            	$NORMAL\t\tshow current version\n
@@ -733,9 +733,23 @@ gpkg_download()
 
 gpkg_rm_dir_safe()
 {
-	rm -d "$1" 2>/dev/null
-	if [ "$?" == "0" ]; then
-		showinfo "RM (D) $1"
+	local ldir
+
+	if [ -L "$1" ]; then
+		#symbol link, check link  
+		ldir=$(realpath "$1")
+		rm -d "$ldir" 2>/dev/null
+		if [ "$?" == "0" ]; then
+			rm -d "$1" 2>/dev/null
+			showinfo "RM (D) $ldir"
+			showinfo "RM (D) $1"
+		fi
+	else
+		rm -d "$1" 2>/dev/null
+		if [ "$?" == "0" ]; then
+			showinfo "RM (D) $1"
+		fi
+
 	fi
 }
 
